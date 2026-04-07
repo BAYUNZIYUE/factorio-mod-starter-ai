@@ -1,5 +1,7 @@
 # AI 协作规则
 
+**简体中文** | [English](AI_RULES.en.md)
+
 **本文档为强制性规范，所有 AI 助手必须严格遵守。**
 
 ## 核心原则
@@ -63,6 +65,11 @@
 - `TARGET_MOD` - 指定要打包的模组
 - `MOD_OUTPUT_DIR` - 打包输出目录
 - `FACTORIO_TOKEN` - Factorio API Key
+
+**安全要求：**
+- 禁止把 `FACTORIO_TOKEN` 的真实值写入仓库文件、文档、示例代码、截图或日志
+- 禁止在测试阶段擅自创建 release 或 tag 去验证发布流程
+- 除非用户明确授权，否则只能本地打包，不能触发远端正式发布
 
 ### 5. Workflow 触发条件
 
