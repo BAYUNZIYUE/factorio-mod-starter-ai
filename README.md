@@ -1,6 +1,8 @@
-# Factorio Mod Development Template with AI & Auto-Publishing
+# Factorio Mod Starter AI
 
-> **这是一个指导性模板仓库** - 帮助你通过 AI 辅助完成从零开始编写 Factorio 模组到自动发布的完整流程。
+**简体中文** | [English](README.en.md)
+
+🤖 **AI 友好的 Factorio 模组开发模板**，支持自动打包和发布到 Mod Portal。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Factorio](https://img.shields.io/badge/Factorio-2.0+-orange.svg)](https://factorio.com)
