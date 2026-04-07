@@ -1,5 +1,7 @@
 # Example Mod
 
+**简体中文** | [English](README.en.md)
+
 这是一个示例模组，展示了 Factorio 模组开发的基本结构和最佳实践。
 
 ## 功能
