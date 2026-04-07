@@ -1,0 +1,8 @@
+---------------------------------------------------------------------------------------------------
+Version: 1.0.0
+Date: 2026-04-07
+  Features:
+    - Initial release
+    - Added example item
+    - Added example settings
+    - Demonstrates proper stage boundaries

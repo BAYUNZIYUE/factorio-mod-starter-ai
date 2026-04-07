@@ -1,0 +1,9 @@
+{
+  "name": "example-mod",
+  "version": "1.0.0",
+  "factorio_version": "2.0",
+  "title": "Example Mod",
+  "author": "Your Name",
+  "description": "A simple example mod demonstrating the basic structure and best practices for Factorio mod development.",
+  "dependencies": ["base >= 2.0"]
+}

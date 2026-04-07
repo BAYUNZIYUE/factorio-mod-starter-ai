@@ -1,0 +1,119 @@
+name: Publish to Factorio Mod Portal
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Upload to Mod Portal
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Extract mod name from tag
+        id: extract_mod
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_NAME="${{ github.event.release.tag_name }}"
+            # 从 tag 提取模组名: mod-name-v1.0.0 -> mod-name
+            MOD_NAME=$(echo "$TAG_NAME" | sed 's/-v[0-9].*//')
+            echo "mod_name=$MOD_NAME" >> $GITHUB_OUTPUT
+            echo "发布模组: $MOD_NAME (来自 tag: $TAG_NAME)"
+          else
+            echo "mod_name=" >> $GITHUB_OUTPUT
+            echo "手动触发，将打包所有模组"
+          fi
+
+      - name: Package mods
+        env:
+          MOD_OUTPUT_DIR: ${{ github.workspace }}/dist
+          TARGET_MOD: ${{ steps.extract_mod.outputs.mod_name }}
+        run: python3 pack_mods.py
+
+      - name: Upload to Factorio Mod Portal
+        env:
+          FACTORIO_TOKEN: ${{ secrets.FACTORIO_TOKEN }}
+        run: |
+          set -e
+          
+          # 遍历所有打包好的 zip 文件
+          for ZIP_FILE in ${{ github.workspace }}/dist/*.zip; do
+            if [ ! -f "$ZIP_FILE" ]; then
+              echo "No mod zips found, skipping"
+              exit 0
+            fi
+            
+            # 从文件名提取模组名和版本号
+            BASENAME=$(basename "$ZIP_FILE" .zip)
+            MOD_NAME=$(echo "$BASENAME" | sed 's/_[0-9].*//')
+            VERSION=$(echo "$BASENAME" | sed 's/.*_//')
+            
+            echo "================================================"
+            echo "Publishing: $MOD_NAME v$VERSION"
+            echo "File: $ZIP_FILE"
+            echo "================================================"
+            
+            # Step 1: init_publish - 获取上传 URL
+            echo "Step 1: Requesting upload URL..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://mods.factorio.com/api/v2/mods/init_publish" \
+              -H "Authorization: Bearer $FACTORIO_TOKEN" \
+              -d "mod=$MOD_NAME")
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | head -n-1)
+            
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "❌ init_upload failed (HTTP $HTTP_CODE)"
+              echo "$BODY"
+              exit 1
+            fi
+            
+            UPLOAD_URL=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['upload_url'])")
+            echo "✓ Got upload URL"
+            
+            # Step 2: upload - 上传 zip 文件
+            echo "Step 2: Uploading mod zip..."
+            UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL" \
+              -F "file=@$ZIP_FILE")
+            
+            UPLOAD_HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+            UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | head -n-1)
+            
+            if [ "$UPLOAD_HTTP_CODE" != "200" ]; then
+              echo "❌ Upload failed (HTTP $UPLOAD_HTTP_CODE)"
+              echo "$UPLOAD_BODY"
+              exit 1
+            fi
+            
+            # 检查响应中的 success 字段
+            SUCCESS=$(echo "$UPLOAD_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success', False))")
+            
+            if [ "$SUCCESS" = "True" ]; then
+              echo "✅ Successfully published $MOD_NAME v$VERSION to Factorio Mod Portal"
+            else
+              echo "❌ Upload response indicates failure:"
+              echo "$UPLOAD_BODY"
+              exit 1
+            fi
+            
+            echo ""
+          done
+          
+          echo "================================================"
+          echo "All mods published successfully!"
+          echo "================================================"
