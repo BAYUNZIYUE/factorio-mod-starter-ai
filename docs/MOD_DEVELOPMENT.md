@@ -1,5 +1,7 @@
 # 模组开发规范
 
+**简体中文** | [English](MOD_DEVELOPMENT.en.md)
+
 本文档介绍 Factorio 模组开发的核心概念、目录结构和最佳实践。
 
 ## 目录结构

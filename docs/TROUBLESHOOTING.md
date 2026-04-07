@@ -1,5 +1,7 @@
 # 故障排查指南
 
+**简体中文** | [English](TROUBLESHOOTING.en.md)
+
 本文档列出常见问题和解决方案。
 
 ## 打包问题
