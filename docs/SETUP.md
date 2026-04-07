@@ -1,5 +1,7 @@
 # 环境配置指南
 
+**简体中文** | [English](SETUP.en.md)
+
 本文档介绍如何配置开发环境和 Factorio API Key，以便使用自动发布系统。
 
 ## 前置要求
@@ -63,6 +65,14 @@ example-mod_1.0.0/
 ```
 
 ## 配置 Factorio API Key
+
+在继续之前，建议先阅读：[安全与踩坑总结](SECURITY_AND_PITFALLS.md)。
+
+尤其要注意：
+
+- 不要把真实 `FACTORIO_TOKEN` 提交进仓库
+- 测试阶段不要急着配置真实 Secret
+- 不要把自动发布当成普通测试动作
 
 ### 1. 生成 API Key
 

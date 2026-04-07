@@ -1,5 +1,7 @@
 # 发布流程
 
+**简体中文** | [English](PUBLISHING.en.md)
+
 本文档介绍如何发布模组到 Factorio Mod Portal。
 
 ## ⚠️ 重要警告
