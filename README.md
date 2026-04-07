@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README.en.md)
 
-🤖 **AI 友好的 Factorio 模组开发模板**，支持自动打包和发布到 Mod Portal。
+🤖 **面向 AI 协作优化的 Factorio 模组开发模板**，内置自动打包、发布流程与安全边界说明。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Factorio](https://img.shields.io/badge/Factorio-2.0+-orange.svg)](https://factorio.com)
@@ -33,7 +33,7 @@
 
 ```bash
 # 克隆此模板
-git clone https://github.com/YOUR_USERNAME/factorio-mod-template.git my-factorio-mods
+git clone https://github.com/YOUR_USERNAME/factorio-mod-starter-ai.git my-factorio-mods
 cd my-factorio-mods
 
 # 删除示例模组，开始你的项目
@@ -89,6 +89,7 @@ gh release create my-awesome-mod-v1.0.0 \
 - **[完整设置指南](docs/SETUP.md)** - 从零开始配置开发环境
 - **[模组开发规范](docs/MOD_DEVELOPMENT.md)** - 目录结构、命名规则、最佳实践
 - **[发布流程](docs/PUBLISHING.md)** - 如何发布单个或多个模组
+- **[安全与踩坑总结](docs/SECURITY_AND_PITFALLS.md)** - 账号、API、Secrets、防泄露与误发布风险
 - **[故障排查](docs/TROUBLESHOOTING.md)** - 常见问题和解决方案
 
 ### 给 AI 助手
@@ -102,7 +103,7 @@ gh release create my-awesome-mod-v1.0.0 \
 ## 🏗️ 仓库结构
 
 ```
-factorio-mod-template/
+factorio-mod-starter-ai/
 ├── .github/
 │   ├── workflows/
 │   │   └── publish-to-mod-portal.yml    # 自动发布 workflow
@@ -111,6 +112,7 @@ factorio-mod-template/
 │   ├── SETUP.md                          # 设置指南
 │   ├── MOD_DEVELOPMENT.md                # 开发规范
 │   ├── PUBLISHING.md                     # 发布流程
+│   ├── SECURITY_AND_PITFALLS.md          # 安全与踩坑总结
 │   └── TROUBLESHOOTING.md                # 故障排查
 ├── example-mod/                          # 示例模组（可删除）
 │   └── src/
@@ -246,8 +248,8 @@ gh release create mod-b-v2.1.0 --title "Mod B v2.1.0" --notes "..."
 
 ## 📞 支持
 
-- **问题反馈**: [GitHub Issues](https://github.com/YOUR_USERNAME/factorio-mod-template/issues)
-- **讨论**: [GitHub Discussions](https://github.com/YOUR_USERNAME/factorio-mod-template/discussions)
+- **问题反馈**: [GitHub Issues](https://github.com/YOUR_USERNAME/factorio-mod-starter-ai/issues)
+- **讨论**: [GitHub Discussions](https://github.com/YOUR_USERNAME/factorio-mod-starter-ai/discussions)
 
 ---
 

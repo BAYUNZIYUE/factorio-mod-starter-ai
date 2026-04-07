@@ -1,6 +1,8 @@
 # AGENTS.md - Factorio Mod Template Repository Rules
 
-本文件定义 `factorio-mod-template` 的仓库级默认约束。这是一个**指导性模板仓库**，用于帮助开发者通过 AI 辅助完成 Factorio 模组开发和自动发布。
+**简体中文** | [English](AGENTS.en.md)
+
+本文件定义 `factorio-mod-starter-ai` 的仓库级默认约束。这是一个**指导性模板仓库**，用于帮助开发者通过 AI 辅助完成 Factorio 模组开发与自动发布。
 
 ## Repository Purpose
 

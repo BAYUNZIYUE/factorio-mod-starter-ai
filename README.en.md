@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-🤖 **AI-friendly Factorio mod development template** with automated packaging and publishing to Mod Portal.
+🤖 **An AI-optimized Factorio mod development template** with built-in packaging, publishing, and safety guidance.
 
 ---
 
@@ -26,7 +26,7 @@ Click the "Use this template" button at the top of this page to create your own 
 Or clone manually:
 
 ```bash
-git clone https://github.com/BAYUNZIYUE/factorio-mod-starter-ai.git my-mod-project
+git clone https://github.com/your-username/factorio-mod-starter-ai.git my-mod-project
 cd my-mod-project
 rm -rf .git
 git init
@@ -66,7 +66,7 @@ python3 pack_mods.py
 ### 4. Configure GitHub
 
 1. Create GitHub repository
-2. Configure `FACTORIO_TOKEN` Secret (see [Setup Guide](docs/SETUP.md))
+2. Configure `FACTORIO_TOKEN` Secret (see [Setup Guide](docs/SETUP.en.md))
 3. Push code
 
 ### 5. Publish
@@ -97,7 +97,7 @@ gh release create my-awesome-mod-v1.0.0 \
 - ⚠️ Manually publish first version to verify everything works
 - ⚠️ Explicitly tell AI "do not create releases" during testing
 
-See [Publishing Guide](docs/PUBLISHING.md) for detailed warnings and safe practices.
+See [Publishing Guide](docs/PUBLISHING.en.md) for detailed warnings and safe practices.
 
 ---
 
@@ -113,6 +113,7 @@ factorio-mod-starter-ai/
 │   ├── SETUP.md                 # Environment setup
 │   ├── MOD_DEVELOPMENT.md       # Development specs & stage boundaries
 │   ├── PUBLISHING.md            # Publishing workflow
+│   ├── SECURITY_AND_PITFALLS.md # Security & common pitfalls
 │   └── TROUBLESHOOTING.md       # Common issues & solutions
 ├── example-mod/                 # Example mod
 │   └── src/
@@ -134,15 +135,17 @@ factorio-mod-starter-ai/
 
 ### For Developers
 
-- [Setup Guide](docs/SETUP.md) - Configure environment and API keys
-- [Mod Development](docs/MOD_DEVELOPMENT.md) - Directory structure, stage boundaries, best practices
-- [Publishing Guide](docs/PUBLISHING.md) - How to publish to Mod Portal
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Setup Guide](docs/SETUP.en.md) - Configure environment and API keys
+- [Mod Development](docs/MOD_DEVELOPMENT.en.md) - Directory structure, stage boundaries, best practices
+- [Publishing Guide](docs/PUBLISHING.en.md) - How to publish to Mod Portal
+- [Security & Pitfalls](docs/SECURITY_AND_PITFALLS.en.md) - Accounts, secrets, accidental releases, and leak prevention
+- [Troubleshooting](docs/TROUBLESHOOTING.en.md) - Common issues and solutions
 
 ### For AI Assistants
 
-- [AI_RULES.md](.github/AI_RULES.md) - **MANDATORY** rules for AI collaboration
-- [AGENTS.md](AGENTS.md) - Repository boundary rules
+- [AI_RULES.en.md](.github/AI_RULES.en.md) - **MANDATORY** rules for AI collaboration
+- [AGENTS.en.md](AGENTS.en.md) - Repository boundary rules
+- [Workflow Guide](.github/workflows/README.en.md) - CI/CD and publishing workflow notes
 
 ---
 
@@ -197,7 +200,7 @@ script.on_event(defines.events.on_player_created, function(event)
 end)
 ```
 
-See [MOD_DEVELOPMENT.md](docs/MOD_DEVELOPMENT.md) for detailed explanations.
+See [MOD_DEVELOPMENT.en.md](docs/MOD_DEVELOPMENT.en.md) for detailed explanations.
 
 ---
 
@@ -231,7 +234,7 @@ See [MOD_DEVELOPMENT.md](docs/MOD_DEVELOPMENT.md) for detailed explanations.
 
 ## 🤖 AI-Assisted Development
 
-This template is specifically designed for AI-assisted development with:
+This template is designed to work well with AI-assisted development and clear repository boundaries:
 
 ### Built-in AI Guardrails
 
@@ -242,7 +245,7 @@ This template is specifically designed for AI-assisted development with:
 
 ### Recommended AI Workflow
 
-1. **Tell AI about stage boundaries** - Reference `.github/AI_RULES.md`
+1. **Tell AI about stage boundaries** - Reference `.github/AI_RULES.en.md`
 2. **Test locally first** - Don't configure `FACTORIO_TOKEN` during development
 3. **Review AI changes** - Especially check stage boundaries
 4. **Verify packaging** - Run `pack_mods.py` before publishing
@@ -330,7 +333,7 @@ example-mod_1.0.0/
 
 ## 🤝 Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! See [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for guidelines.
 
 ### Ways to Contribute
 

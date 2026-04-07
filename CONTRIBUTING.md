@@ -1,5 +1,7 @@
 # 贡献指南
 
+**简体中文** | [English](CONTRIBUTING.en.md)
+
 欢迎为本模板仓库贡献！本文档介绍如何使用此模板和贡献改进。
 
 ## 使用此模板
@@ -14,7 +16,7 @@
 ### 方法 2: 手动复制
 
 ```bash
-git clone https://github.com/your-username/factorio-mod-template.git my-mod-project
+git clone https://github.com/your-username/factorio-mod-starter-ai.git my-mod-project
 cd my-mod-project
 rm -rf .git
 git init
