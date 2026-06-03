@@ -2,7 +2,9 @@
 
 **简体中文** | [English](AGENTS.en.md)
 
-本文件是 `factorio-mod-starter-ai` 的项目级持久记忆。这是一个 **Factorio 模组开发模板仓库**，用于帮助开发者通过 AI 辅助完成 Factorio 模组开发与自动发布。新会话进入仓库后，应先读本文件，再读 `.github/AI_RULES.md` 与 `docs/` 下的文档。
+本文件是本仓库的项目级持久记忆。这是一个 **Factorio 模组开发模板仓库**，用于帮助开发者通过 AI 辅助完成 Factorio 模组开发与自动发布。新会话进入仓库后，应先读本文件，再读 `.github/AI_RULES.md` 与 `docs/` 下的文档。
+
+> **克隆后须知**：如果你以此模板创建了自己的模组项目，克隆后应将本文件（`AGENTS.md`）加入 `.gitignore`。模板仓库中 AGENTS.md 是交付物（版本受控），但在具体的模组项目中，它是跨实例不应同步的本地记忆——你的构建环境、调试经验、项目决策不应被意外提交到 Git 历史中。
 
 ## 项目概述
 
@@ -124,4 +126,4 @@
 - `example-mod/` 是模板自带的示例模组，不是正式交付内容。它用于展示结构，用户克隆后应删除或替换为自己的模组
 - 打包输出目录在本地（`/home/factorio-mod-zips/`）与 CI（`dist/`）不一致，这是有意为之：本地固定路径方便测试，CI 临时目录避免残留
 - 双语文档（中文为主、英文翻译）采用独立文件方案（`*.en.md`）而非 i18n 目录，简化 GitHub 渲染和贡献流程
-- 模板不含 headless smoke test 工作流，因为不同模组的验证需求差异大；需要 smoke test 的项目可参考 `Factorio-MOD` 仓库的 workflow 配置
+- 模板不含 headless smoke test 工作流，因为不同模组的验证需求差异大；需要 smoke test 的项目可自行添加 GitHub Actions workflow，或在 Factorio Modding 社区查找现成方案

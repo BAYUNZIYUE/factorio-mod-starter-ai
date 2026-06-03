@@ -2,7 +2,9 @@
 
 [简体中文](AGENTS.md) | **English**
 
-This file is the project-level persistent memory for `factorio-mod-starter-ai`. This is a **Factorio mod development template repository** designed to help developers build and publish Factorio mods with AI assistance. New sessions entering the repository should read this file first, then `.github/AI_RULES.md` and the documents under `docs/`.
+This file is the project-level persistent memory for this repository. This is a **Factorio mod development template repository** designed to help developers build and publish Factorio mods with AI assistance. New sessions entering the repository should read this file first, then `.github/AI_RULES.md` and the documents under `docs/`.
+
+> **After cloning**: If you create your own mod project from this template, add this file (`AGENTS.md`) to `.gitignore` after cloning. In the template repository, AGENTS.md is a deliverable (version-controlled). In a concrete mod project, however, it is local, per-instance memory that should not sync across instances — your build environment, debugging experience, and project decisions should not be accidentally committed to Git history.
 
 ## Project Overview
 
@@ -124,4 +126,4 @@ Why this matters:
 - `example-mod/` is a sample mod shipped with the template, not a deliverable. It demonstrates structure; users should delete or replace it after cloning
 - Local packaging output (`/home/factorio-mod-zips/`) and CI output (`dist/`) intentionally differ: the fixed local path simplifies testing, while the CI temp directory avoids residue
 - Bilingual documentation (Chinese primary, English translation) uses separate files (`*.en.md`) rather than an i18n directory to simplify GitHub rendering and contribution workflows
-- The template does not include a headless smoke test workflow, as verification needs vary widely across mods; projects needing smoke tests can reference the `Factorio-MOD` repository's workflow configuration
+- The template does not include a headless smoke test workflow, as verification needs vary widely across mods; projects needing smoke tests can add their own GitHub Actions workflow or consult the Factorio modding community for existing solutions
