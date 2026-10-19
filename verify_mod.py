@@ -16,6 +16,16 @@ from mod_utils import (
 )
 
 
+def infer_target(tag: str | None, target: str | None) -> str | None:
+    """When a tag is given without --target, verify only that tag's mod."""
+    if tag and not target:
+        try:
+            return parse_tag(tag)[0]
+        except ValueError:
+            return None
+    return target
+
+
 def verify_sources(
     repo_root: Path, *, target: str | None, tag: str | None, allow_example: bool = True
 ) -> tuple[list[str], list[str], int]:
@@ -24,6 +34,7 @@ def verify_sources(
 
     # The template's example mod is part of the repository and must stay valid,
     # even though pack_mods.py excludes it from publishing by default.
+    target = infer_target(tag, target)
     include_example = allow_example or target == EXAMPLE_MOD
     mod_dirs = iter_mod_dirs(repo_root, include_example=include_example)
     if target:
@@ -78,6 +89,8 @@ def verify_zips(
     if not archives:
         return [f"{zip_dir} 中没有 zip 文件"], warnings, 0
 
+    target = infer_target(tag, target)
+
     tag_name = tag_version = None
     if tag:
         try:
@@ -87,15 +100,19 @@ def verify_zips(
 
     checked = 0
     for archive in archives:
-        name = archive.stem.rsplit("_", 1)[0] if "_" in archive.stem else archive.stem
+        if "_" not in archive.stem:
+            errors.append(f"{archive.name}: 文件名必须是 <name>_<version>.zip")
+            continue
+        name, version = archive.stem.rsplit("_", 1)
         if target and name != target:
             continue
         checked += 1
-        archive_errors = validate_zip(archive)
+        archive_errors = validate_zip(
+            archive, expected_name=name, expected_version=version
+        )
         errors.extend(archive_errors)
 
         if tag_name is not None:
-            version = archive.stem.rsplit("_", 1)[-1]
             if name != tag_name:
                 errors.append(
                     f"{archive.name}: zip 模组名 {name!r} 与 tag {tag_name!r} 不一致"
@@ -117,26 +134,34 @@ def verify_zips(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--root", default=Path(__file__).resolve().parent, type=Path,
+        "--root", default=None, type=Path,
         help="repository root (default: script directory)",
     )
-    parser.add_argument("--target", help="only verify this mod (directory name)")
+    parser.add_argument(
+        "--target",
+        help="source mode: mod directory name; zip mode: mod name in the zip filename",
+    )
     parser.add_argument("--tag", help="release tag, e.g. my-mod-v1.0.0")
     parser.add_argument("--zip-dir", type=Path, help="verify packaged zips in this directory")
     parser.add_argument(
         "--exclude-example", action="store_true",
-        help=f"do not verify {EXAMPLE_MOD!r} during source verification",
+        help=f"source mode only: do not verify {EXAMPLE_MOD!r}",
     )
     args = parser.parse_args()
 
     if args.zip_dir is not None:
+        if args.root is not None:
+            parser.error("--root 不能与 --zip-dir 一起使用")
+        if args.exclude_example:
+            parser.error("--exclude-example 只用于源码校验，不能与 --zip-dir 一起使用")
         errors, warnings, count = verify_zips(
             args.zip_dir, target=args.target, tag=args.tag
         )
         scope = f"{count} 个 zip"
     else:
+        root = (args.root or Path(__file__).resolve().parent).resolve()
         errors, warnings, count = verify_sources(
-            args.root.resolve(),
+            root,
             target=args.target,
             tag=args.tag,
             allow_example=not args.exclude_example,

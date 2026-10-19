@@ -20,16 +20,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
+
+      - name: Detect mods
+        id: detect
+        run: |
+          if find . -maxdepth 3 -path '*/src/info.json' -print -quit | grep -q .; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "::error::No mods found. Add <name>/src/info.json (or keep example-mod)."
+            exit 1
+          fi
 
       - name: Verify sources
+        if: steps.detect.outputs.any == 'true'
         run: python3 verify_mod.py
 
-      - name: Package the example mod
-        env:
-          TARGET_MOD: example-mod
-          MOD_OUTPUT_DIR: dist
-        run: python3 pack_mods.py
+      - name: Package mods
+        if: steps.detect.outputs.any == 'true'
+        run: |
+          set -e
+          if [ -f example-mod/src/info.json ] && \
+             [ -z "$(find . -maxdepth 3 -path '*/src/info.json' -not -path './example-mod/*' -print -quit)" ]; then
+            # Template repository only: use the example as the smoke fixture.
+            TARGET_MOD=example-mod MOD_OUTPUT_DIR=dist python3 pack_mods.py
+          else
+            # User repository: package every real mod (example is excluded by default).
+            MOD_OUTPUT_DIR=dist python3 pack_mods.py
+          fi
 
-      - name: Verify packaged zip
-        run: python3 verify_mod.py --zip-dir dist --target example-mod
+      - name: Verify packaged zips
+        if: steps.detect.outputs.any == 'true'
+        run: python3 verify_mod.py --zip-dir dist

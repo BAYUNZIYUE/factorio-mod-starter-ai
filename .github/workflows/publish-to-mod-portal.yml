@@ -2,12 +2,17 @@ name: Publish to Factorio Mod Portal
 
 on:
   release:
-    types: [published]
+    types: [published, released]
   workflow_dispatch:
     inputs:
       target_mod:
         description: "Mod directory to package/publish (required)"
         required: true
+        type: string
+      version:
+        description: "Expected mod version; required when confirm=PUBLISH"
+        required: false
+        default: ""
         type: string
       confirm:
         description: "Type PUBLISH to upload; leave empty to only package (dry-run)"
@@ -42,7 +47,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
       - name: Resolve target mod and version
         id: meta
@@ -50,16 +55,21 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           TAG_NAME: ${{ github.event.release.tag_name }}
           INPUT_TARGET: ${{ inputs.target_mod }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
         run: |
           python3 - <<'PY'
+          import json
           import os
           from pathlib import Path
 
-          from mod_utils import parse_tag
+          from mod_utils import NAME_RE, VERSION_RE, parse_tag
 
           event = os.environ.get("EVENT_NAME", "")
           tag = (os.environ.get("TAG_NAME") or "").strip()
           target = (os.environ.get("INPUT_TARGET") or "").strip()
+          version = (os.environ.get("INPUT_VERSION") or "").strip()
+          confirm = (os.environ.get("INPUT_CONFIRM") or "").strip()
 
           if event == "release":
               if not tag:
@@ -68,8 +78,14 @@ jobs:
           else:
               if not target:
                   raise SystemExit("workflow_dispatch 必须提供 target_mod")
+              if version and not VERSION_RE.fullmatch(version):
+                  raise SystemExit(f"非法 version: {version!r}（要求 major.minor.patch）")
+              if confirm == "PUBLISH" and not version:
+                  raise SystemExit("confirm=PUBLISH 时必须提供 version")
               tag = ""
-              version = ""
+
+          if not NAME_RE.fullmatch(target) or Path(target).name != target:
+              raise SystemExit(f"非法 target_mod: {target!r}")
 
           info_path = Path(target) / "src" / "info.json"
           if not info_path.is_file():
@@ -77,10 +93,17 @@ jobs:
           if target == "example-mod":
               raise SystemExit("拒绝发布 example-mod（模板示例模组）")
 
+          info = json.loads(info_path.read_text(encoding="utf-8-sig"))
+          info_version = str(info.get("version", ""))
+          if version and info_version != version:
+              raise SystemExit(
+                  f"version 不匹配: 输入 {version!r} vs info.json {info_version!r}"
+              )
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               fh.write(f"target={target}\n")
               fh.write(f"tag={tag}\n")
-              fh.write(f"version={version}\n")
+              fh.write(f"version={version or info_version}\n")
           PY
 
       - name: Verify sources
@@ -129,11 +152,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
       - name: Download zips
         uses: actions/download-artifact@v4
@@ -149,5 +174,5 @@ jobs:
           if [ -n "$TAG" ]; then
             python3 scripts/publish_mod.py --zip-dir dist --tag "$TAG"
           else
-            python3 scripts/publish_mod.py --zip-dir dist
+            python3 scripts/publish_mod.py --zip-dir dist --all
           fi

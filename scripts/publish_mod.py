@@ -3,6 +3,11 @@
 
 Handles both first-time publishing (init_publish) and new releases of an
 existing mod (releases/init_upload), which are two different API endpoints.
+
+Safety defaults:
+- one tag publishes exactly one zip; publishing several zips requires --all
+- --dry-run prints the plan and never uploads; without a token it cannot query
+  the portal and reports that explicitly
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -20,12 +26,18 @@ from pathlib import Path
 # Allow running as `python3 scripts/publish_mod.py` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from mod_utils import parse_tag  # noqa: E402
+from mod_utils import parse_tag, validate_zip  # noqa: E402
 
 API_BASE = "https://mods.factorio.com/api"
 USER_AGENT = "factorio-mod-starter-ai"
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 3
+
+
+def safe_url(url: str) -> str:
+    """Drop query/fragment: upload URLs are signed and must not reach logs."""
+    parts = urllib.parse.urlsplit(url)
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
 
 def request(
@@ -57,12 +69,14 @@ def request(
             if attempt < MAX_ATTEMPTS:
                 time.sleep(2 ** attempt)
                 continue
-            raise RuntimeError(f"请求失败: {url}: {exc}") from exc
+            raise RuntimeError(f"请求失败: {safe_url(url)}: {exc}") from exc
 
-    raise RuntimeError(f"请求失败: {url}: {last_error}")
+    raise RuntimeError(f"请求失败: {safe_url(url)}: {last_error}")
 
 
-def multipart(fields: dict[str, str], file_field: tuple[str, Path] | None = None) -> tuple[bytes, str]:
+def multipart(
+    fields: dict[str, str], file_field: tuple[str, Path] | None = None
+) -> tuple[bytes, str]:
     boundary = uuid.uuid4().hex
     chunks: list[bytes] = []
 
@@ -101,17 +115,32 @@ def get_mod(name: str) -> tuple[bool, list[str]]:
     return True, versions
 
 
-def publish_one(archive: Path, token: str, *, dry_run: bool) -> None:
+def publish_one(archive: Path, token: str | None, *, dry_run: bool) -> None:
     stem = archive.stem
     if "_" not in stem:
         raise RuntimeError(f"{archive.name}: 文件名必须是 <name>_<version>.zip")
     name, version = stem.rsplit("_", 1)
+
     if name == "example-mod":
         raise RuntimeError(f"{archive.name}: 拒绝发布模板示例模组 example-mod")
 
+    errors = validate_zip(archive, expected_name=name, expected_version=version)
+    if errors:
+        raise RuntimeError(f"{archive.name}: zip 校验失败: {'; '.join(errors)}")
+
+    if dry_run:
+        print(
+            f"DRY   {name} {version}: 未查询 Mod Portal；"
+            "正式发布会自动选择 init_publish 或 releases/init_upload"
+        )
+        return
+
     exists, versions = get_mod(name)
     if version in versions:
-        print(f"SKIP  {name} {version} 已存在于 Mod Portal，跳过（幂等）")
+        print(
+            f"SKIP  {name} {version} 已存在于 Mod Portal；未上传任何内容，"
+            "已发布版本不会被覆盖（要更新内容必须提升版本号）"
+        )
         return
 
     endpoint = (
@@ -123,8 +152,10 @@ def publish_one(archive: Path, token: str, *, dry_run: bool) -> None:
     print(f"PLAN  {action}: {name} {version} -> {endpoint}")
 
     if dry_run:
+        print("DRY   未上传（--dry-run）")
         return
 
+    assert token is not None
     payload, content_type = multipart({"mod": name})
     status, body = request(
         endpoint,
@@ -144,7 +175,9 @@ def publish_one(archive: Path, token: str, *, dry_run: bool) -> None:
     init_payload = json.loads(body.decode("utf-8"))
     upload_url = init_payload.get("upload_url")
     if not upload_url:
-        raise RuntimeError(f"{name}: 响应缺少 upload_url: {init_payload}")
+        raise RuntimeError(
+            f"{name}: 响应缺少 upload_url（响应字段: {', '.join(init_payload)}）"
+        )
 
     upload_payload, upload_content_type = multipart({}, ("file", archive))
     status, body = request(
@@ -175,14 +208,31 @@ def publish_one(archive: Path, token: str, *, dry_run: bool) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--zip-dir", type=Path, default=Path("dist"))
-    parser.add_argument("--tag", help="release tag; only publish the matching mod/version")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--tag", help="release tag; publishes only the matching mod/version")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="publish every zip in --zip-dir (requires this explicit flag)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the plan without uploading and without querying the portal",
+    )
     args = parser.parse_args()
 
-    token = os.getenv("FACTORIO_TOKEN", "").strip()
-    if not token:
-        print("错误: 未设置 FACTORIO_TOKEN", file=sys.stderr)
+    if not args.tag and not args.all:
+        print(
+            "错误: 未指定 --tag。为防止误发，一次只发布一个 tag；"
+            "如确需批量发布，请显式加 --all",
+            file=sys.stderr,
+        )
         return 1
+    if args.tag and args.all:
+        print("错误: --tag 与 --all 不能同时使用", file=sys.stderr)
+        return 1
+
+    token = os.getenv("FACTORIO_TOKEN", "").strip() or None
 
     archives = sorted(args.zip_dir.glob("*.zip"))
     if not archives:
@@ -190,7 +240,11 @@ def main() -> int:
         return 1
 
     if args.tag:
-        tag_name, tag_version = parse_tag(args.tag)
+        try:
+            tag_name, tag_version = parse_tag(args.tag)
+        except ValueError as exc:
+            print(f"错误: {exc}", file=sys.stderr)
+            return 1
         archives = [
             a for a in archives
             if a.stem == f"{tag_name}_{tag_version}"
@@ -202,6 +256,10 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+
+    if token is None and not args.dry_run:
+        print("错误: 未设置 FACTORIO_TOKEN", file=sys.stderr)
+        return 1
 
     failed = False
     for archive in archives:

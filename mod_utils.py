@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,6 +49,7 @@ EXCLUDED_DIR_PARTS = {
 }
 
 EXCLUDED_FILE_NAMES = {".DS_Store", "Thumbs.db"}
+EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".zip", ".tsbuildinfo"}
 
 # The template example must never be published by default. It can still be
 # packaged on purpose with TARGET_MOD=example-mod.
@@ -155,13 +157,49 @@ def validate_changelog(path: Path, info: dict, check: ModCheck) -> None:
     if not versions:
         check.errors.append(f"{path.relative_to(check.mod_dir)}: 缺少 'Version:' 行")
     elif versions[0] != str(info["version"]):
-        check.warnings.append(
+        check.errors.append(
             f"{path.relative_to(check.mod_dir)}: 顶部版本 {versions[0]!r} "
             f"与 info.json {info['version']!r} 不一致"
         )
 
     if not any(line.startswith("Date:") for line in lines):
         check.warnings.append(f"{path.relative_to(check.mod_dir)}: 缺少 'Date:' 行")
+
+
+def validate_info_fields(info: dict, label: str) -> list[str]:
+    """Shared info.json field checks for both sources and packaged zips."""
+    errors: list[str] = []
+
+    missing = [f for f in REQUIRED_INFO_FIELDS if not info.get(f)]
+    if missing:
+        return [f"{label}: info.json 缺少字段: {', '.join(missing)}"]
+
+    name = str(info["name"])
+    version = str(info["version"])
+    factorio_version = str(info["factorio_version"])
+
+    if not NAME_RE.fullmatch(name):
+        errors.append(
+            f"{label}: 非法 mod name {name!r}"
+            "（只允许小写字母、数字、-、_，长度 3-50）"
+        )
+    if not VERSION_RE.fullmatch(version):
+        errors.append(
+            f"{label}: 非法 version {version!r}（要求 major.minor.patch）"
+        )
+    if not FACTORIO_VERSION_RE.fullmatch(factorio_version):
+        errors.append(
+            f"{label}: 非法 factorio_version {factorio_version!r}"
+            '（要求两段式主版本，如 "2.0"）'
+        )
+
+    deps = info.get("dependencies")
+    if deps is not None and (
+        not isinstance(deps, list) or not all(isinstance(d, str) for d in deps)
+    ):
+        errors.append(f"{label}: dependencies 必须是字符串数组")
+
+    return errors
 
 
 def validate_mod_dir(mod_dir: Path) -> ModCheck:
@@ -175,42 +213,17 @@ def validate_mod_dir(mod_dir: Path) -> ModCheck:
 
     check.info = info
 
-    missing = [f for f in REQUIRED_INFO_FIELDS if not info.get(f)]
-    if missing:
-        check.errors.append(
-            f"{mod_dir.name}: info.json 缺少字段: {', '.join(missing)}"
-        )
+    field_errors = validate_info_fields(info, mod_dir.name)
+    check.errors.extend(field_errors)
+    if field_errors:
         return check
 
     name = str(info["name"])
     version = str(info["version"])
-    factorio_version = str(info["factorio_version"])
 
-    if not NAME_RE.fullmatch(name):
-        check.errors.append(
-            f"{mod_dir.name}: 非法 mod name {name!r}"
-            "（只允许小写字母、数字、-、_，长度 3-50）"
-        )
     if name != mod_dir.name:
         check.errors.append(
             f"{mod_dir.name}: 目录名与 info.json 的 name 不一致（name={name!r}）"
-        )
-    if not VERSION_RE.fullmatch(version):
-        check.errors.append(
-            f"{mod_dir.name}: 非法 version {version!r}（要求 major.minor.patch）"
-        )
-    if not FACTORIO_VERSION_RE.fullmatch(factorio_version):
-        check.errors.append(
-            f"{mod_dir.name}: 非法 factorio_version {factorio_version!r}"
-            '（要求两段式主版本，如 "2.0"）'
-        )
-
-    deps = info.get("dependencies")
-    if deps is not None and (
-        not isinstance(deps, list) or not all(isinstance(d, str) for d in deps)
-    ):
-        check.errors.append(
-            f"{mod_dir.name}: dependencies 必须是字符串数组"
         )
 
     src_dir = mod_dir / "src"
@@ -258,21 +271,20 @@ def iter_packable_files(src_dir: Path, mod_dir: Path) -> tuple[list[Path], list[
     errors: list[str] = []
 
     for path in sorted(src_dir.rglob("*")):
+        rel = path.relative_to(src_dir)
+        if path.is_symlink():
+            errors.append(f"{mod_dir.name}: 不允许符号链接: {rel.as_posix()}")
+            continue
         if path.is_dir():
             continue
-        rel = path.relative_to(src_dir)
 
         if any(part in EXCLUDED_DIR_PARTS for part in rel.parts):
             continue
-        if rel.name in EXCLUDED_FILE_NAMES or rel.suffix in {".pyc", ".pyo"}:
+        if rel.name in EXCLUDED_FILE_NAMES or rel.suffix in EXCLUDED_SUFFIXES:
             continue
         # TypeScript sources are build inputs, not runtime files. Factorio only
         # loads the compiled .lua output.
         if rel.suffix in {".ts", ".tsx"}:
-            continue
-
-        if path.is_symlink():
-            errors.append(f"{mod_dir.name}: 不允许符号链接: {rel.as_posix()}")
             continue
 
         try:
@@ -304,11 +316,11 @@ def write_zip(
     src_dir = mod_dir / "src"
 
     def add(zf: ZipFile, source: Path, arcname: str) -> None:
-        data = source.read_bytes()
         entry = ZipInfo(arcname, date_time=ZIP_DATE_TIME)
         entry.compress_type = ZIP_DEFLATED
         entry.external_attr = ZIP_FILE_MODE
-        zf.writestr(entry, data)
+        with source.open("rb") as src, zf.open(entry, "w") as dst:
+            shutil.copyfileobj(src, dst)
 
     try:
         with ZipFile(tmp_path, "w", compression=ZIP_DEFLATED) as zf:
@@ -390,16 +402,34 @@ def validate_zip(
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{archive_path.name}: info.json 无法解析: {exc}")
         else:
-            if str(info.get("name")) != name:
-                errors.append(
-                    f"{archive_path.name}: info.json name {info.get('name')!r} "
-                    f"与文件名 {name!r} 不一致"
-                )
-            if str(info.get("version")) != version:
-                errors.append(
-                    f"{archive_path.name}: info.json version {info.get('version')!r} "
-                    f"与文件名 {version!r} 不一致"
-                )
+            if not isinstance(info, dict):
+                errors.append(f"{archive_path.name}: info.json 顶层必须是对象")
+            else:
+                errors.extend(validate_info_fields(info, archive_path.name))
+                if str(info.get("name")) != name:
+                    errors.append(
+                        f"{archive_path.name}: info.json name {info.get('name')!r} "
+                        f"与文件名 {name!r} 不一致"
+                    )
+                if str(info.get("version")) != version:
+                    errors.append(
+                        f"{archive_path.name}: info.json version {info.get('version')!r} "
+                        f"与文件名 {version!r} 不一致"
+                    )
+
+    lua_entries = {f"{archive_root}/{prefix}.lua" for prefix in ENTRYPOINT_PREFIXES}
+    if not any(entry in names for entry in lua_entries):
+        errors.append(
+            f"{archive_path.name}: 缺少 Lua 入口"
+            "（control.lua / data.lua / settings.lua 至少一个）"
+        )
+
+    ts_entries = [entry for entry in names if entry.endswith((".ts", ".tsx"))]
+    if ts_entries:
+        errors.append(
+            f"{archive_path.name}: 包含未编译的 TypeScript 文件: "
+            f"{', '.join(ts_entries)}"
+        )
 
     changelog_entries = [n for n in names if n.endswith("/changelog.txt")]
     if len(changelog_entries) > 1:
