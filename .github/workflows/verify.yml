@@ -1,0 +1,35 @@
+name: Verify mod structure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Verify sources
+        run: python3 verify_mod.py
+
+      - name: Package the example mod
+        env:
+          TARGET_MOD: example-mod
+          MOD_OUTPUT_DIR: dist
+        run: python3 pack_mods.py
+
+      - name: Verify packaged zip
+        run: python3 verify_mod.py --zip-dir dist --target example-mod
