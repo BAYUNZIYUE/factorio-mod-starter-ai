@@ -20,7 +20,7 @@
     ├── data-final-fixes.lua     # 最终原型修改（可选）
     ├── settings-updates.lua     # 设置修改（可选）
     ├── settings-final-fixes.lua # 最终设置修改（可选）
-    ├── changelog.txt            # 版本更新日志
+    ├── changelog.txt            # 推荐但非必需
     ├── thumbnail.png            # 模组缩略图（可选）
     ├── locale/                  # 本地化文件
     │   ├── en/
@@ -30,8 +30,13 @@
     ├── graphics/                # 图片资源
     ├── sounds/                  # 音频资源
     ├── prototypes/              # 原型定义（可选，用于组织代码）
-    └── scripts/                 # 运行时脚本（可选，用于组织代码）
+    ├── scripts/                 # 运行时脚本（可选，用于组织代码）
+    └── migrations/              # 存档迁移脚本（可选）
 ```
+
+`info.json` 是唯一强制文件，其余入口文件按需添加；`changelog.txt` 推荐但非必需。
+
+Factorio 只加载 `.lua` 入口文件。如使用 TypeScript，必须先用 TypeScriptToLua 编译为 `.lua`；本模板不内置该编译链。
 
 ## info.json 必需字段
 
@@ -51,7 +56,7 @@
 
 - `name`: 模组内部标识符，必须与目录名一致，使用 kebab-case
 - `version`: 语义化版本号（major.minor.patch）
-- `factorio_version`: 最低支持的 Factorio 版本
+- `factorio_version`: 目标 Factorio 主版本，只能写一个主版本号（如 `"2.0"`）。当前 stable 为 2.0.x，2.1 仍为 experimental；2.0 的模组不会自动在 2.1 加载
 - `title`: 玩家可见的模组名称
 - `author`: 作者名称
 - `description`: 简短描述
@@ -59,7 +64,7 @@
 
 ## Factorio 阶段边界
 
-Factorio 模组加载分为三个阶段，每个阶段有不同的 API 可用。**违反阶段边界会导致运行时错误。**
+Factorio 的加载流程不止三个阶段。进入游戏后，Settings 与 Data 阶段先执行，原型锁定后进入 control 阶段；control 阶段内部还有明确的回调顺序。每个阶段可用的 API 不同，**违反阶段边界会导致运行时错误。**
 
 ### 阶段执行顺序
 
@@ -76,13 +81,22 @@ Factorio 模组加载分为三个阶段，每个阶段有不同的 API 可用。
    - data-updates.lua
    - data-final-fixes.lua
   ↓
-3. 原型锁定（data.raw 变为只读）
+3. 原型锁定（原型不能再修改）
   ↓
-4. Control 阶段
-   - control.lua 加载
-   - 事件处理器注册
+4. Control 阶段：control.lua 加载
+   - 顶层只能使用 script、remote、commands
+   - game、rendering 在顶层不可用
   ↓
-5. 游戏运行
+5. on_init（新存档首次创建时）
+  ↓
+6. migrations（从旧版本存档升级时）
+   - src/migrations/<mod-version>.lua
+  ↓
+7. on_load（每次存档加载时）
+  ↓
+8. on_configuration_changed（模组或游戏版本变化时）
+  ↓
+9. 游戏运行
    - 事件触发
    - 运行时逻辑执行
 ```
@@ -146,16 +160,16 @@ end
 
 **目的**: 运行时逻辑和事件处理
 
-**可用 API**:
-- `script` (事件注册、全局变量)
-- `game` (游戏状态访问)
-- `remote` (模组间通信)
-- `rendering` (渲染 API)
-- `settings.global`, `settings.player` (运行时设置)
+**可用 API**（注意可用位置）:
+- 顶层：`script` (事件注册、全局变量)、`remote` (模组间通信)、`commands` (自定义控制台命令)
+- 仅回调内（`on_init` / `on_configuration_changed` / 事件回调）：`game` (游戏状态访问)、`rendering` (渲染 API)
+- 运行时设置：`settings.global`, `settings.player`
 
 **禁止使用**:
-- `data:extend` (原型已锁定)
-- `data.raw` 修改 (只读)
+- 在 `control.lua` 顶层使用 `game` 或 `rendering`
+- 访问 `data` 全局（`data` 在 control 阶段不可访问，原型已锁定）
+
+顶层只允许 `script`、`remote`、`commands`；需要 `game` 的逻辑必须放进 `on_init`、`on_configuration_changed` 或事件回调。
 
 **示例**:
 
@@ -181,13 +195,15 @@ end
 
 **解决**: 将此逻辑移到 `control.lua`
 
-### 错误 2: 在 control 阶段修改原型
+### 错误 2: 在 control 阶段访问 data
 
 ```lua
 data.raw["item"]["iron-plate"].stack_size = 200
 ```
 
-**错误信息**: `data.raw is read-only`
+**错误信息**: `attempt to index global 'data' (a nil value)`
+
+**原因**: `data` 全局只在 data 阶段存在。control 阶段访问不到 `data`（不是“只读”），原型已锁定。
 
 **解决**: 将此逻辑移到 `data.lua` 或 `data-final-fixes.lua`
 
@@ -333,12 +349,16 @@ local my_item_prototype = game.item_prototypes["my-item"]
 
 ### 使用 migrations
 
-当修改原型名称时，创建 `migrations/` 目录：
+当修改原型名称时，在 `src/migrations/` 下创建迁移脚本：
 
 ```
-migrations/
-└── 1.1.0.lua
+<mod-name>/
+└── src/
+    └── migrations/
+        └── <mod-version>.lua
 ```
+
+例如模组从 `1.0.0` 升级到 `1.1.0`，迁移文件为 `src/migrations/1.1.0.lua`。文件名中的版本号是**模组版本号**（`info.json` 的 `version`），不是 Factorio 版本号；Factorio 只会执行版本号高于当前存档所记录模组版本的迁移脚本。
 
 ```lua
 for _, surface in pairs(game.surfaces) do

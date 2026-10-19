@@ -33,32 +33,33 @@ Fix: add all required fields such as `name`, `version`, `factorio_version`, `tit
 
 Cause: no valid `control`, `data`, or `settings` entry file exists under `src/`.
 
-Fix: create at least one of:
+Fix: create at least one of (`.lua` only; Factorio does not load `.ts`, so compile TypeScript to `.lua` with TypeScriptToLua first):
 
-- `control.lua` / `control.ts`
-- `data.lua` / `data.ts`
-- `settings.lua` / `settings.ts`
+- `control.lua`
+- `data.lua`
+- `settings.lua`
 
 ## Publishing Problems
 
 ### Problem 1: `FACTORIO_TOKEN` is missing or invalid
 
+Common error: `init_publish/init_upload failed (HTTP 401)`.
+
 Fix:
 
 1. Generate a new key at https://factorio.com/profile
-2. Enable `ModPortal: Publish Mods`
+2. Enable `ModPortal: Publish Mods` and `ModPortal: Upload Mods` (add `ModPortal: Edit Mods` if you edit mod details)
 3. Add it as the GitHub secret `FACTORIO_TOKEN`
 
 ### Problem 2: mod does not exist on Mod Portal
 
-Cause: the first release requires a mod page to exist first.
+Cause: the workflow is using `releases/init_upload` (which only works for existing mods), or the token lacks the matching scope (`Publish Mods` / `Upload Mods`).
 
 Fix:
 
-1. Package the mod locally
-2. Open https://mods.factorio.com/
-3. Upload the first version manually
-4. Use automation after the page exists
+- For a brand-new mod, the workflow calls `init_publish` and creates the page automatically; no manual step is required.
+- If the error persists, check the token scopes first and retry.
+- Manual fallback: package the mod locally, then upload the first version on https://mods.factorio.com/ with **Upload mod**. Later versions use `releases/init_upload`.
 
 ### Problem 3: wrong tag format
 
@@ -73,7 +74,7 @@ Fix:
 
 Cause: the tag version and `info.json.version` differ.
 
-Fix: keep them identical.
+Fix: the workflow runs `verify_mod.py --tag` and refuses to publish when they differ. You can also run `python3 verify_mod.py --target <mod-name> --tag <tag>` locally before creating the release.
 
 ### Problem 5: workflow is still using old code
 
@@ -93,9 +94,9 @@ Cause: runtime APIs were used during the data stage.
 
 Fix: move that logic to `control.lua`.
 
-### `data.raw is read-only`
+### `attempt to index global 'data' (a nil value)`
 
-Cause: prototype mutation attempted during the control stage.
+Cause: `data` was accessed during the control stage. The `data` global does not exist there (it is not merely read-only), and prototypes are locked.
 
 Fix: move prototype changes into `data.lua` or `data-final-fixes.lua`.
 
@@ -165,7 +166,7 @@ Fix:
 
 Cause: prototype names changed without a migration.
 
-Fix: add a script under `migrations/<version>.lua`.
+Fix: add a script under `src/migrations/<mod-version>.lua`. The filename uses the mod version, not the Factorio version.
 
 ### Multiplayer desyncs
 

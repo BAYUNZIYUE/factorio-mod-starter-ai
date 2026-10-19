@@ -41,9 +41,10 @@
    python3 pack_mods.py
    ```
 
-2. **首次发布手动操作**：
-   - 第一个版本手动上传到 Mod Portal
-   - 确认一切正常后再启用自动发布
+2. **首次发布先确认权限**：
+   - 新模组由 workflow 调用 `init_publish` 自动创建并发布
+   - 如自动创建失败，再手动上传第一个版本作为兜底
+   - 确认一切正常后再持续使用自动发布
 
 3. **使用测试仓库**：
    - 在测试仓库中验证 workflow
@@ -66,11 +67,11 @@
 ## 发布前检查清单
 
 - [ ] 更新 `src/info.json` 中的 `version` 字段
-- [ ] 更新 `changelog.txt`
+- [ ] 更新 `changelog.txt`（推荐，但非必需）
 - [ ] 测试模组在游戏中可正常加载
-- [ ] 本地测试打包：`TARGET_MOD="your-mod" python3 pack_mods.py`
+- [ ] 本地验证并打包：`python3 verify_mod.py` + `TARGET_MOD="your-mod" python3 pack_mods.py`
 - [ ] 验证 zip 文件结构正确
-- [ ] 确认 `FACTORIO_TOKEN` 已配置（GitHub Secret）
+- [ ] 仅在正式发布时配置 `FACTORIO_TOKEN`（GitHub Secret）
 
 ## 单模组发布（推荐）
 
@@ -88,7 +89,7 @@
 }
 ```
 
-编辑 `changelog.txt`：
+编辑 `changelog.txt`（推荐，非必需）：
 
 ```
 ---------------------------------------------------------------------------------------------------
@@ -115,6 +116,7 @@ git tag example-mod-v1.0.1
 git push origin example-mod-v1.0.1
 
 # 创建 release
+# ⚠️ 这会真实发布到 Mod Portal，已发布版本不可删除
 gh release create example-mod-v1.0.1 \
   --title "Example Mod v1.0.1" \
   --notes "Bug fixes and improvements"
@@ -125,42 +127,28 @@ gh release create example-mod-v1.0.1 \
 1. 访问仓库的 "Actions" 标签
 2. 查看 "Publish to Factorio Mod Portal" workflow
 3. 确认所有步骤成功（绿色勾号）
-4. 访问 https://mods.factorio.com/mod/example-mod 确认新版本已发布
+4. 访问 `https://mods.factorio.com/mod/<mod-name>` 确认新版本已发布
 
 ## 多模组发布
 
-如需同时发布多个模组，手动触发 workflow。
+一个 release 只发布一个模组。多个模组时，逐个创建 release：
 
-### 步骤 1: 更新所有模组的版本信息
+1. 为每个要发布的模组更新 `info.json`（`changelog.txt` 推荐同步更新）并提交
+2. 对每个模组创建 tag 与 release，例如 `mod-a-v1.1.0`、`mod-b-v2.0.0`
+3. 每个 release 独立触发 workflow，只发布对应模组
+4. 在 Actions 中逐个确认结果
 
-为每个要发布的模组更新 `info.json` 和 `changelog.txt`。
-
-### 步骤 2: 提交更改
-
-```bash
-git add .
-git commit -m "Bump versions for multiple mods"
-git push origin main
-```
-
-### 步骤 3: 手动触发 workflow
-
-方法 1: 使用 GitHub 网页界面
-
-1. 访问 https://github.com/your-username/your-repo/actions/workflows/publish-to-mod-portal.yml
-2. 点击 "Run workflow"
-3. 选择 `main` 分支
-4. 点击 "Run workflow"
-
-方法 2: 使用 GitHub CLI
+如需先预演（不发布），手动触发并指定模组，`confirm` 留空只打包：
 
 ```bash
-gh workflow run publish-to-mod-portal.yml
+gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a
 ```
 
-### 步骤 4: 验证发布
+确认产物无误后，再执行上传：
 
-检查 workflow 运行状态，确认所有模组都成功发布。
+```bash
+gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a -f confirm=PUBLISH
+```
 
 ## Tag 命名规则
 
@@ -193,17 +181,23 @@ gh workflow run publish-to-mod-portal.yml
 
 ## 首次发布新模组
 
-首次发布新模组时，需要先在 Mod Portal 手动创建模组页面。
+首次发布新模组不再需要手动创建页面：workflow 会检测 Mod Portal 上是否已存在该模组，不存在时调用 `init_publish` 自动创建并发布第一个版本。
 
-### 步骤 1: 本地打包
+### 步骤 1: 本地验证与打包
 
 ```bash
+python3 verify_mod.py
 export TARGET_MOD="your-new-mod"
-export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-### 步骤 2: 手动上传到 Mod Portal
+### 步骤 2: 创建 release
+
+确认 Token 已勾选 `ModPortal: Publish Mods`（创建新模组）与 `ModPortal: Upload Mods`（后续版本），然后按正常的 tag/release 流程发布。workflow 会自动走 `init_publish`。
+
+### 步骤 3: 手动兜底（可选）
+
+如果自动创建因权限或平台问题失败，可以在 Mod Portal 手动创建页面：
 
 1. 访问 https://mods.factorio.com/
 2. 登录你的账号
@@ -217,9 +211,7 @@ python3 pack_mods.py
 5. 上传 zip 文件
 6. 点击 "Submit"
 
-### 步骤 3: 后续版本使用自动发布
-
-模组页面创建后，后续版本可以使用自动发布系统。
+页面创建后，后续版本会走 `releases/init_upload` 自动发布。
 
 ## 发布失败处理
 
@@ -248,16 +240,13 @@ python3 pack_mods.py
 
 ### 场景 2: 版本号不一致
 
-错误信息：
+Workflow 不会在发布前自动检查版本一致性。发布前请运行：
 
+```bash
+python3 verify_mod.py --target <mod-name> --tag <tag>
 ```
-❌ Upload response indicates failure:
-{"error": "Version mismatch"}
-```
 
-解决方案：
-
-确保 tag 中的版本号与 `info.json` 中的版本号一致。
+该脚本会校验 tag 中的模组名/版本与 `info.json` 是否一致；两者不一致时不要创建 release。
 
 ### 场景 3: 模组不存在
 
@@ -270,20 +259,20 @@ python3 pack_mods.py
 
 解决方案：
 
-首次发布需要手动创建模组页面（见上文"首次发布新模组"）。
+首次发布新模组时，workflow 会自动调用 `init_publish` 创建页面（见上文"首次发布新模组"）。若仍报此错，请检查 Token 权限，或改用手动上传兜底。
 
 ### 场景 4: API Key 权限不足
 
 错误信息：
 
 ```
-❌ init_upload failed (HTTP 401)
+❌ init_publish/init_upload failed (HTTP 401)
 ```
 
 解决方案：
 
 1. 访问 https://factorio.com/profile
-2. 重新生成 API Key，确保勾选 `ModPortal: Publish Mods` 权限
+2. 重新生成 API Key，勾选 `ModPortal: Publish Mods` 与 `ModPortal: Upload Mods`（如需修改详情再加 `ModPortal: Edit Mods`）
 3. 更新 GitHub Secret `FACTORIO_TOKEN`
 
 ## 回滚版本
@@ -322,15 +311,17 @@ gh release create example-mod-v1.0.2 \
 
 ### 触发条件
 
-1. **Release 发布**: 自动提取模组名并发布单个模组
-2. **手动触发**: 打包并发布所有模组
+1. **Release 发布**: 检出 tag 指向的提交，提取模组名并发布单个模组；prerelease 不发布
+2. **手动触发**: 只打包 `target_mod` 指定的模组；默认 dry-run，只有 `confirm=PUBLISH` 时上传
 
 ### 工作流程
 
 1. **提取模组名**: 从 tag 名称提取（如果是 release 触发）
 2. **打包模组**: 运行 `pack_mods.py`
-3. **上传到 Mod Portal**:
-   - 调用 `init_publish` API 获取上传 URL
+3. **上传到 Mod Portal**：
+   - 判断 Mod Portal 上是否已存在该模组
+   - 新模组调用 `init_publish` 创建并获取上传 URL
+   - 已存在的模组调用 `releases/init_upload` 获取上传 URL
    - 上传 zip 文件
    - 验证上传成功
 

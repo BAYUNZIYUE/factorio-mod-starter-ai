@@ -40,7 +40,9 @@ example-mod/
 
 ### Control Stage (`control.lua`)
 - **Allowed**: runtime logic and event handling
-- **Forbidden**: modifying prototypes (`data.raw` is read-only here)
+- **Top level**: `script`, `remote`, `commands`
+- **Only inside callbacks**: `game`, `rendering` (`on_init` / `on_configuration_changed` / event handlers)
+- **Forbidden**: accessing `data` (it does not exist in the control stage; prototypes are locked)
 
 ## How to Use It
 
@@ -54,7 +56,7 @@ example-mod/
 - All player-facing text should live in `locale/`
 - Use `data-final-fixes.lua` when your changes must run after other mods
 - Put complex runtime logic into `scripts/` to keep `control.lua` small
-- If you rename prototypes, consider adding `migrations/` for save compatibility
+- If you rename prototypes, consider adding `src/migrations/` for save compatibility
 
 ## References
 

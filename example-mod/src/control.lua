@@ -1,7 +1,8 @@
 -- Control stage: Runtime logic and event handlers
 -- This runs when a save is loaded or a new game is started
--- Available: script, game, remote, rendering (runtime APIs)
--- NOT available: data:extend, data.raw modifications (prototypes are locked)
+-- At the top level only script, remote and commands exist.
+-- game and rendering become available inside on_init and event handlers.
+-- NOT available: data (the global is gone; prototypes are locked)
 
 -- Example: Give items to new players
 script.on_event(defines.events.on_player_created, function(event)

@@ -40,7 +40,9 @@ example-mod/
 
 ### Control 阶段 (`control.lua`)
 - **只能做**: 运行时逻辑、事件处理
-- **禁止**: 修改原型（`data.raw` 只读）
+- **顶层可用**: `script`、`remote`、`commands`
+- **仅回调内可用**: `game`、`rendering`（`on_init` / `on_configuration_changed` / 事件回调）
+- **禁止**: 访问 `data`（control 阶段不存在，原型已锁定）
 
 ## 使用方法
 
@@ -54,7 +56,7 @@ example-mod/
 - 所有玩家可见的文本都应该在 `locale/` 中定义
 - 使用 `data-final-fixes.lua` 来确保你的修改在其他模组之后执行
 - 复杂的运行时逻辑应该放在 `scripts/` 目录下，保持 `control.lua` 简洁
-- 修改原型标识时，考虑添加 `migrations/` 来保持存档兼容性
+- 修改原型标识时，考虑添加 `src/migrations/` 来保持存档兼容性
 
 ## 参考资料
 

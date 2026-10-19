@@ -32,7 +32,7 @@ This template is AI-friendly, but that also creates risk:
 ### Safe practice recommendations
 
 1. Keep testing local until you are ready
-2. Prefer a manual first publish
+2. The first publish can be automated via `init_publish`; keep manual upload as a fallback
 3. Test workflows in a safe repository without real secrets when possible
 4. Explicitly tell AI not to create releases unless you authorize it
 
@@ -41,11 +41,11 @@ This template is AI-friendly, but that also creates risk:
 ## Pre-Publish Checklist
 
 - [ ] Update `src/info.json.version`
-- [ ] Update `changelog.txt`
+- [ ] Update `changelog.txt` (recommended, not required)
 - [ ] Test the mod in-game
-- [ ] Test packaging locally
+- [ ] Verify and package locally (`python3 verify_mod.py` + `python3 pack_mods.py`)
 - [ ] Verify zip structure
-- [ ] Confirm `FACTORIO_TOKEN` is configured only when needed
+- [ ] Configure `FACTORIO_TOKEN` only for a real publish
 
 ## Publishing a Single Mod (Recommended)
 
@@ -53,7 +53,7 @@ Use tag format `<mod-name>-v<version>`.
 
 ### Step 1: Update version information
 
-Update `src/info.json` and `changelog.txt`.
+Update `src/info.json`; update `changelog.txt` as well if you keep one (recommended).
 
 ### Step 2: Commit the changes
 
@@ -69,6 +69,7 @@ git push origin main
 git tag example-mod-v1.0.1
 git push origin example-mod-v1.0.1
 
+# ⚠️ This publishes to Mod Portal for real; published versions cannot be deleted.
 gh release create example-mod-v1.0.1 \
   --title "Example Mod v1.0.1" \
   --notes "Bug fixes and improvements"
@@ -138,17 +139,23 @@ Use semantic versioning:
 
 ## First Release of a New Mod
 
-The first release often requires manually creating the Mod Portal page.
+You no longer need to create the page manually first. The workflow checks whether the mod already exists: if not, it calls `init_publish` to create the mod and publish the first version.
 
-### Step 1: package locally
+### Step 1: verify and package locally
 
 ```bash
+python3 verify_mod.py
 export TARGET_MOD="your-new-mod"
-export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-### Step 2: upload manually on Mod Portal
+### Step 2: create the release
+
+Make sure the token includes `ModPortal: Publish Mods` (create a new mod) and `ModPortal: Upload Mods` (later versions), then follow the normal tag/release flow. The workflow uses `init_publish` automatically.
+
+### Step 3: manual fallback (optional)
+
+If automatic creation fails because of permissions or platform issues, create the page manually:
 
 1. Visit https://mods.factorio.com/
 2. Sign in
@@ -157,9 +164,7 @@ python3 pack_mods.py
 5. Upload the zip
 6. Submit the form
 
-### Step 3: use automation for later versions
-
-Once the mod page exists, later releases can use automated publishing.
+Once the page exists, later versions use `releases/init_upload` automatically.
 
 ## Handling Failed Releases
 
@@ -169,15 +174,15 @@ Delete the wrong tag and create a correctly formatted one.
 
 ### Version mismatch
 
-Ensure the tag version matches `info.json.version`.
+The workflow runs `verify_mod.py --tag` before packaging and refuses to publish when they differ. You can also run `python3 verify_mod.py --target <mod-name> --tag <tag>` locally first.
 
 ### Mod does not exist
 
-Create the initial mod page manually first.
+The workflow calls `init_publish` automatically for a new mod. If the error persists, check the token scopes, or create the initial mod page manually as a fallback.
 
 ### API key permission problems
 
-Regenerate the key and ensure `ModPortal: Publish Mods` is enabled.
+Regenerate the key and enable `ModPortal: Publish Mods` and `ModPortal: Upload Mods` (add `ModPortal: Edit Mods` if you need to edit mod details).
 
 ## Rolling Forward After a Bad Release
 
@@ -196,7 +201,7 @@ Remember: Mod Portal does not support normal deletion of published versions.
 
 1. Extract mod name from tag
 2. Run `pack_mods.py`
-3. Call `init_publish`
+3. Call `init_publish` for a new mod, or `releases/init_upload` for an existing mod
 4. Upload the zip
 5. Validate success
 

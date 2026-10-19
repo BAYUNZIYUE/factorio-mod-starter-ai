@@ -5,7 +5,7 @@
 🤖 **面向 AI 协作优化的 Factorio 模组开发模板**，内置自动打包、发布流程与安全边界说明。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Factorio](https://img.shields.io/badge/Factorio-2.0+-orange.svg)](https://factorio.com)
+[![Factorio](https://img.shields.io/badge/Factorio-2.0-orange.svg)](https://factorio.com)
 
 ---
 
@@ -40,15 +40,7 @@ cd my-factorio-mods
 rm -rf example-mod/
 ```
 
-### 2. 配置 Factorio API Key
-
-1. 访问 https://factorio.com/profile
-2. 生成 API Key，勾选 `ModPortal: Publish Mods`
-3. 在 GitHub 仓库添加 Secret：`FACTORIO_TOKEN`
-
-详见 [配置指南](docs/SETUP.md)
-
-### 3. 创建你的第一个模组
+### 2. 创建你的第一个模组
 
 ```bash
 # 创建模组目录
@@ -71,14 +63,72 @@ EOF
 echo "-- My awesome mod" > my-awesome-mod/src/control.lua
 ```
 
-### 4. 发布到 Mod Portal
+### 3. 本地验证与打包
 
 ```bash
+# 校验 info.json、入口文件与目录结构
+python3 verify_mod.py
+
+# 打包，输出到仓库根目录的 dist/
+python3 pack_mods.py
+```
+
+`dist/` 下应生成 `<name>_<version>.zip`。zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文件名格式 `{name}_{version}.zip`。本地开发阶段到这里即可，不需要配置 `FACTORIO_TOKEN`。
+
+`factorio_version` 只能写一个主版本（如 `"2.0"`）。当前 stable 为 2.0.x，2.1 仍为 experimental；2.0 的模组不会自动在 2.1 加载。
+
+详见 [配置指南](docs/SETUP.md)
+
+---
+
+## 🔐 首次正式发布前
+
+1. 访问 https://factorio.com/profile
+2. 生成 API Key，按用途勾选权限：
+   - `ModPortal: Publish Mods`（首次创建新模组）
+   - `ModPortal: Upload Mods`（给已存在的模组发布新版本）
+   - `ModPortal: Edit Mods`（如需修改模组详情）
+3. 在 GitHub 仓库添加 Secret：`FACTORIO_TOKEN`
+
+> ⚠️ **配置真实 `FACTORIO_TOKEN` 后，创建 release 就会真实发布到 Mod Portal，且已发布版本不可删除。** 开发阶段不要配置该 Secret，本地验证即可。
+
+---
+
+## 🚀 发布到 Mod Portal
+
+> ⚠️ **这会真实发布到 Mod Portal，版本不可删除。** 发布前请确认模组名、版本号与内容均正确，并已通过 `python3 verify_mod.py --target <mod-name> --tag <tag>` 校验。Tag 中的版本必须与 `info.json` 的 `version` 一致。
+
+```bash
+# 创建并推送 tag（格式：<mod-name>-v<version>）
+git tag my-awesome-mod-v1.0.0
+git push origin my-awesome-mod-v1.0.0
+
 # 创建 release（自动触发发布）
 gh release create my-awesome-mod-v1.0.0 \
   --title "My Awesome Mod v1.0.0" \
   --notes "Initial release"
 ```
+
+Workflow 会自动判断 Mod Portal 上是否已存在该模组：不存在时走 `init_publish` 创建，已存在时走 `releases/init_upload` 发布新版本。
+
+---
+
+## ⚠️ 重要警告
+
+**Factorio Mod Portal 不支持删除已发布内容：**
+
+- ❌ 已发布的模组无法删除
+- ❌ 已发布的版本无法删除
+- ❌ 发布无法撤回
+
+**使用 AI 辅助开发时：**
+
+- ⚠️ AI 可能误触发 release
+- ⚠️ 测试阶段不要配置 `FACTORIO_TOKEN`
+- ⚠️ 首次正式发布前人工核对模组名、版本与内容
+- ⚠️ 测试期间明确告诉 AI“不要创建 release”
+
+详见 [发布流程](docs/PUBLISHING.md) 中的警告与安全实践。
 
 ---
 
@@ -106,23 +156,21 @@ gh release create my-awesome-mod-v1.0.0 \
 factorio-mod-starter-ai/
 ├── .github/
 │   ├── workflows/
-│   │   └── publish-to-mod-portal.yml    # 自动发布 workflow
-│   └── AI_RULES.md                       # AI 强制规范
-├── docs/
-│   ├── SETUP.md                          # 设置指南
-│   ├── MOD_DEVELOPMENT.md                # 开发规范
-│   ├── PUBLISHING.md                     # 发布流程
-│   ├── SECURITY_AND_PITFALLS.md          # 安全与踩坑总结
-│   └── TROUBLESHOOTING.md                # 故障排查
-├── example-mod/                          # 示例模组（可删除）
+│   │   ├── verify.yml                   # push/PR 校验与打包
+│   │   └── publish-to-mod-portal.yml    # 发布 workflow
+│   └── AI_RULES.md                      # AI 强制规范
+├── docs/                                # 中文文档（英文版为 *.en.md）
+├── example-mod/                         # 示例模组（可删除）
 │   └── src/
-│       ├── info.json
-│       └── control.lua
-├── pack_mods.py                          # 打包脚本
-├── AGENTS.md                             # 仓库边界规则
-├── CONTRIBUTING.md                       # 贡献指南
+├── scripts/
+│   └── publish_mod.py                   # Mod Portal 发布脚本
+├── mod_utils.py                         # 校验与打包共享逻辑
+├── verify_mod.py                        # 校验入口
+├── pack_mods.py                         # 打包入口
+├── AGENTS.md                            # 仓库规则入口
+├── CONTRIBUTING.md                      # 贡献指南
 ├── .gitignore
-└── README.md                             # 本文件
+└── README.md                            # 本文件
 ```
 
 ---
@@ -131,21 +179,21 @@ factorio-mod-starter-ai/
 
 ### 1. 多模组支持
 
-在同一仓库中管理多个模组，每个模组独立发布：
+在同一仓库中管理多个模组。一个 release 只发布一个模组，且版本不可删除：
 
 ```bash
-# 只发布 mod-a
+# 只发布 mod-a（会真实发布，请先本地 verify）
 gh release create mod-a-v1.0.0 --title "Mod A v1.0.0" --notes "..."
 
-# 只发布 mod-b  
+# 只发布 mod-b
 gh release create mod-b-v2.1.0 --title "Mod B v2.1.0" --notes "..."
 ```
 
 ### 2. 自动化发布
 
-- 创建 release → 自动打包 → 自动上传到 Mod Portal
-- 支持手动触发
-- 完整的错误处理和日志
+- 创建 release → 校验 tag/版本 → 打包 → 上传到 Mod Portal
+- 首次发布自动走 `init_publish`，后续版本自动走 `releases/init_upload`
+- 手动触发默认 dry-run，输入 `confirm=PUBLISH` 才真正上传
 
 ### 3. AI 友好
 
@@ -157,9 +205,9 @@ gh release create mod-b-v2.1.0 --title "Mod B v2.1.0" --notes "..."
 ### 4. 最佳实践
 
 - 遵循 Factorio 官方规范
-- 支持 TypeScript（可选）
+- 以 `.lua` 为入口文件（Factorio 只加载 `.lua`；如使用 TypeScript，需先用 TypeScriptToLua 编译，模板不内置该编译链）
 - 本地化支持
-- 版本管理和 changelog
+- 版本管理（`changelog.txt` 推荐但非必需）
 
 ---
 
@@ -193,9 +241,11 @@ gh release create mod-b-v2.1.0 --title "Mod B v2.1.0" --notes "..."
 
 - ✅ Tag 格式：`<mod-name>-v<version>`
 - ✅ 目录结构：`<mod-name>/src/info.json`
-- ✅ API 端点：`init_publish`（不是 `init_upload`）
-- ❌ 禁止修改核心环境变量名称
-- ❌ 禁止修改 workflow 触发条件
+- ✅ API 端点：首次创建模组用 `init_publish`，已存在的模组发新版本用 `releases/init_upload`（workflow 自动判断，两者都是合法端点）
+- ❌ 未获授权不创建 release、不推 tag（发布不可逆）
+- ❌ 不把真实 `FACTORIO_TOKEN` 写入仓库，也不要用它“测试发布”
+- ❌ 不发布 `example-mod`（workflow 会拒绝）
+- ❌ 不修改 `TARGET_MOD`、`MOD_OUTPUT_DIR`、`FACTORIO_TOKEN` 的名称
 
 详见 [AI_RULES.md](.github/AI_RULES.md)
 

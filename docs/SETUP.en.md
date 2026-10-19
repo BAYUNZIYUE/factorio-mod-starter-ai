@@ -63,6 +63,8 @@ example-mod_1.0.0/
         └── locale.cfg
 ```
 
+The `name_version/` root folder inside the zip is a template convention. Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
+
 ## Configure the Factorio API Key
 
 Before continuing, read [Security & Pitfalls](SECURITY_AND_PITFALLS.en.md).
@@ -80,7 +82,9 @@ Especially remember:
 3. Find the **API Keys** section
 4. Click **Generate new API key**
 5. Enable:
-   - `ModPortal: Publish Mods`
+   - `ModPortal: Publish Mods` (create a new mod)
+   - `ModPortal: Upload Mods` (upload a new version of an existing mod)
+   - `ModPortal: Edit Mods` (edit mod details, if needed)
 6. Click **Create**
 7. Copy the key immediately; it is shown only once
 
@@ -95,22 +99,14 @@ Especially remember:
 
 ### 3. Verify the setup
 
-Only do this when you are ready for a real publish flow. For early testing, prefer local packaging only.
+**Do not use a release or tag to verify configuration.** Run `python3 pack_mods.py` and `python3 verify_mod.py` locally instead. A release triggers a real publish as soon as it is created, and Mod Portal versions cannot be deleted.
 
 ```bash
-git tag example-mod-v1.0.0
-git push origin example-mod-v1.0.0
-
-gh release create example-mod-v1.0.0 \
-  --title "Example Mod v1.0.0" \
-  --notes "Initial release"
+python3 verify_mod.py    # validate info.json, entrypoints, and layout
+python3 pack_mods.py     # write the archive to dist/
 ```
 
-Then inspect GitHub Actions:
-
-1. Open the **Actions** tab
-2. Find **Publish to Factorio Mod Portal**
-3. Confirm all steps passed
+Only configure the secret when you are actually ready for a formal release.
 
 ## Environment Variables
 
@@ -118,9 +114,9 @@ Then inspect GitHub Actions:
 
 Packaging output directory.
 
-- Default: `/home/factorio-mod-zips`
-- CI: `${{ github.workspace }}/dist`
-- Local: `./dist`
+- Default: `dist` (in the repository root)
+- Override when needed, e.g. `export MOD_OUTPUT_DIR="./out"`
+- CI also uses `dist/`
 
 ### `TARGET_MOD`
 
@@ -164,21 +160,21 @@ Fix by adding the required fields in `info.json`.
 
 ### GitHub Actions fails because `FACTORIO_TOKEN` is missing
 
-Common symptom: unauthorized upload failure.
+Common symptom: unauthorized upload failure (`init_publish/init_upload failed (HTTP 401)`).
 
 Fix:
 
 1. Add the `FACTORIO_TOKEN` secret
-2. Confirm the key includes `ModPortal: Publish Mods`
+2. Confirm the key includes `ModPortal: Publish Mods` and `ModPortal: Upload Mods`
 3. Confirm the key is still valid
 
 ### First publish fails because the mod does not exist
 
 Fix:
 
-1. Create the mod page manually on https://mods.factorio.com/
-2. Upload the first version manually
-3. Use automation for later versions
+- For a brand-new mod, the workflow calls `init_publish` and creates the mod page automatically; no manual step is required.
+- If `Mod does not exist` still appears, the workflow is using `releases/init_upload` (valid only for existing mods), or the token lacks the matching scope (`Publish Mods` / `Upload Mods`). Check the token scopes and retry.
+- As a fallback, create the page manually on https://mods.factorio.com/ with "Upload mod" and upload the first version there.
 
 ## Next Steps
 

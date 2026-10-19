@@ -62,11 +62,11 @@ Modify the files you need:
 - `control.lua` - runtime logic
 - `locale/` - localized text
 
-### 4. Test Packaging
+### 4. Verify and Package Locally
 
 ```bash
+python3 verify_mod.py
 export TARGET_MOD="my-awesome-mod"
-export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
@@ -82,6 +82,7 @@ python3 pack_mods.py
 git tag my-awesome-mod-v1.0.0
 git push origin my-awesome-mod-v1.0.0
 
+# ⚠️ This publishes to Mod Portal for real; published versions cannot be deleted.
 gh release create my-awesome-mod-v1.0.0 \
   --title "My Awesome Mod v1.0.0" \
   --notes "Initial release"
@@ -125,7 +126,7 @@ If you want to improve the template itself, pull requests are welcome.
 ### Versioning
 
 - Use semantic versioning: `major.minor.patch`
-- Update both `info.json` and `changelog.txt` before each release
+- Update `info.json` before each release; `changelog.txt` is recommended but optional
 - Use tag format: `<mod-name>-v<version>`
 
 ### Code Organization
@@ -165,28 +166,35 @@ git push origin mod-a-v1.0.0
 
 Only `mod-a` will be packaged and published.
 
-### Publish All Mods
+### Manually Publish One Mod
+
+Manual dispatch processes only `target_mod` and is a dry-run by default; it
+uploads only when `confirm` is `PUBLISH`:
 
 ```bash
-gh workflow run publish-to-mod-portal.yml
+gh workflow run publish-to-mod-portal.yml \
+  -f target_mod=mod-a \
+  -f confirm=PUBLISH
 ```
+
+Without `confirm`, the workflow only packages and uploads an artifact.
 
 ## AI Collaboration Rules
 
-If you use AI assistants while building mods, follow `.github/AI_RULES.md`.
+If you use AI assistants while building mods, follow `.github/AI_RULES.en.md`.
 
 ### Key Rules
 
 - Do not change core naming conventions (tag format, directory layout)
 - Do not change the API endpoint or environment variable names
 - Respect Factorio stage boundaries strictly
-- Always test packaging and publishing behavior after relevant changes
+- After relevant changes, verify locally (`python3 verify_mod.py` + `python3 pack_mods.py`); publish only after explicit authorization
 
 ### Stage Boundaries Matter Most
 
 - `settings.lua`: define settings only; never use `game` or `script`
 - `data.lua`: define prototypes only; never use runtime APIs
-- `control.lua`: runtime logic only; never mutate `data.raw`
+- `control.lua`: runtime logic only; the `data` global is inaccessible in this stage and prototypes are locked
 
 Breaking these rules leads to runtime errors.
 

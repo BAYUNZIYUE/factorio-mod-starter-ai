@@ -158,25 +158,25 @@ Correct:
 
 It is safer to treat Mod Portal publishing as near-irreversible.
 
-### 2. API endpoints are easy to get wrong
+### 2. API endpoints depend on the operation
 
-Confirmed endpoint:
+Verified against the official wiki: both endpoints are valid and serve different purposes.
 
-- `https://mods.factorio.com/api/v2/mods/init_publish`
+- Creating a new mod: `POST https://mods.factorio.com/api/v2/mods/init_publish`, token scope `ModPortal: Publish Mods`
+- Uploading a new version of an existing mod: `POST https://mods.factorio.com/api/v2/mods/releases/init_upload`, token scope `ModPortal: Upload Mods`
+- Editing mod details additionally requires `ModPortal: Edit Mods`
 
-Common wrong guesses:
-
-- `init_upload`
-- old paths
-- guessed v1/v2 variants
+`init_upload` is not a wrong endpoint, but it only works for mods that already exist; it cannot create a new mod. The workflow detects whether the mod exists and picks the right endpoint.
 
 Lesson: always verify external API details against official docs.
 
-### 3. First publish and later automated publishes are different
+### 3. First publish and later automated publishes
 
-The first release often requires manually creating the mod page first.
+For a brand-new mod, the workflow calls `init_publish` to create the page automatically. Later versions use `releases/init_upload`.
 
-Lesson: first release manually, later releases automatically.
+If automatic creation fails (for example due to token scope or platform limits), upload the first version manually on Mod Portal as a fallback.
+
+Lesson: make sure the token has `Publish Mods` for the first release and `Upload Mods` for later versions.
 
 ### 4. Repository metadata can leak identities
 
@@ -211,7 +211,7 @@ python3 pack_mods.py
 Check:
 
 - `info.json` version is correct
-- `changelog.txt` is updated
+- `changelog.txt` is updated (recommended)
 - tag format is correct
 - mod name matches directory name
 - zip contents are correct
@@ -223,7 +223,7 @@ Check:
 - verify repository and Mod Portal page setup manually
 - verify secrets are configured correctly
 - verify this is not just a test build
-- prefer a manual first release
+- the workflow creates the mod via `init_publish` on first publish; upload manually only as a fallback
 
 ### Phase 4: later automated releases
 

@@ -1,129 +1,104 @@
-# AGENTS.md - Factorio Mod Template Repository Rules
+# AGENTS.md — Factorio Mod Starter AI
 
 **简体中文** | [English](AGENTS.en.md)
 
-本文件是本仓库的项目级持久记忆。这是一个 **Factorio 模组开发模板仓库**，用于帮助开发者通过 AI 辅助完成 Factorio 模组开发与自动发布。新会话进入仓库后，应先读本文件，再读 `.github/AI_RULES.md` 与 `docs/` 下的文档。
+本文件是仓库的唯一入口规则，保持简短。详细说明按需读 `docs/`，不要预加载全部文档。
 
-> **克隆后须知**：如果你以此模板创建了自己的模组项目，克隆后应将本文件（`AGENTS.md`）加入 `.gitignore`。模板仓库中 AGENTS.md 是交付物（版本受控），但在具体的模组项目中，它是跨实例不应同步的本地记忆——你的构建环境、调试经验、项目决策不应被意外提交到 Git 历史中。
+## 这个仓库是什么
 
-## 项目概述
+一个 **Factorio 模组开发模板**：多模组目录 + 打包脚本 + GitHub Actions 发布 + AI 协作约束。
+它本身不是模组项目。用它创建项目后，保留 `AGENTS.md`（应提交），删除 `example-mod/`。
 
-这是一个 **Factorio 模组开发模板仓库**，不是具体的模组项目。
+模板仓库与实例仓库的区别：
 
-提供：
-- 完整的多模组工作区结构
-- 自动打包脚本（`pack_mods.py`）和 GitHub Actions 发布流程
-- AI 协作规范（`.github/AI_RULES.md`）与仓库边界规则（本文件）
-- 开发指南和最佳实践文档（`docs/`）
-- 双语支持（中/英文文档、README、贡献指南）
+| 角色 | 位置 | 是否提交 |
+|---|---|---|
+| 项目规则 | `AGENTS.md` / `.github/AI_RULES.md` | 是 |
+| 个人环境信息（本机路径、token、调试笔记） | `AGENTS.local.md`（若工具支持）或本地未跟踪文件 | 否 |
+| 打包产物 | `dist/` | 否（已在 `.gitignore`） |
 
-使用此模板创建新项目时，克隆仓库后删掉 `example-mod/` 即可开始开发。
-
-## 技术栈
-
-- Factorio 2.0 模组开发，模组代码以 Lua 为主，目录约定允许 `*.lua` / `*.ts` 入口
-- Python 3 打包脚本：`pack_mods.py`
-- GitHub Actions：`.github/workflows/publish-to-mod-portal.yml`（自动发布到 Mod Portal）
-- 文档格式：Markdown（中/英文双语）
-
-## Packaging Boundary
-
-- 只有仓库根目录下、且包含 `src/info.json` 的目录，才视为正式可打包模组
-- 打包入口脚本是仓库根目录的 `pack_mods.py`
-- 打包输出目录默认为 `/home/factorio-mod-zips/`，可通过 `MOD_OUTPUT_DIR` 环境变量自定义
-- 示例模组 `example-mod/` 仅供参考，实际使用时应删除或替换
-
-## Required Mod Layout
-
-每个正式模组都应采用：
+## 目录约定
 
 ```text
 <mod-name>/
-├── README.md
-└── src/
-    ├── info.json
-    ├── control.lua / control.ts
-    ├── data.lua / data.ts
-    ├── settings.lua / settings.ts
-    ├── settings-updates.lua / settings-final-fixes.lua
-    ├── data-updates.lua / data-final-fixes.lua
-    ├── locale/
-    ├── scripts/
-    ├── prototypes/
-    └── changelog.txt
+├── src/
+│   ├── info.json              # 唯一必需文件
+│   ├── control.lua            # 运行时；顶层只有 script/remote/commands
+│   ├── data.lua               # 原型；data-updates.lua / data-final-fixes.lua
+│   ├── settings.lua           # 设置；settings-updates.lua / settings-final-fixes.lua
+│   ├── locale/<lang>/locale.cfg
+│   ├── migrations/<mod-version>.lua   # 旧存档迁移，文件名是模组版本
+│   ├── scripts/               # 运行时逻辑拆分
+│   ├── prototypes/
+│   ├── graphics/
+│   └── changelog.txt          # 推荐，非必需
+└── README.md
 ```
 
-## 架构引导
+硬性规则：
 
-- `pack_mods.py` 会扫描仓库根目录下所有包含 `src/info.json` 的目录，将其视为正式可打包模组
-- 正式模组必须位于仓库根目录，采用 `<mod-name>/src/` 结构；目录名应与 `src/info.json` 中的 `name` 一致
-- `example-mod/` 是模板自带的示例，展示完整的 `<mod>/src/` 结构和最小可运行入口文件
-- 模板本身不包含实际模组业务代码；用户克隆后删除 `example-mod/`，按 `<mod-name>/src/info.json` 结构创建自己的模组
-- `.github/workflows/publish-to-mod-portal.yml` 负责自动发布；`.github/AI_RULES.md` 是 AI 协作的强制规范
+- 目录名必须等于 `src/info.json` 的 `name`（小写字母/数字/`-`/`_`，3–50 字符）
+- `version` 必须是 `major.minor.patch`；`factorio_version` 必须是两段式主版本（如 `"2.0"`）
+- 入口只认 `.lua`。TypeScript 必须先用 TypeScriptToLua 编译为同名 `.lua`；模板不内置编译链
+- 只打包 `src/` 下的文件；构建产物、临时文件、`.git`、`node_modules`、`__pycache__`、`.DS_Store` 会被排除
+- `example-mod/` 默认不参与打包；显式 `TARGET_MOD=example-mod` 时才打包
 
-## Factorio Stage Boundaries
+## 阶段边界（违反会加载失败）
 
-**关键约束（违反会导致运行时错误）：**
+| 阶段 | 允许 | 禁止 |
+|---|---|---|
+| `settings*` | `data:extend` 设置原型、`settings.startup` | `game`、`script`、运行时 API |
+| `data*` | `data:extend`、`data.raw`、原型定义/修改、`settings.startup` | `game`、`script`、`remote`、事件注册 |
+| `control.lua` 顶层 | `script`、`remote`、`commands` | `game`、`rendering`、`data`（不存在） |
+| 事件回调 / `on_init` / `on_configuration_changed` | 完整运行时 API、`game`、`rendering` | 修改原型（已锁定） |
 
-- `settings*`：只定义设置项（`data:extend` 设置原型）
-- `data*`：只处理 `data:extend`、`data.raw`、原型定义与修改
-- `control.lua` / `scripts/`：只处理运行时 API，如 `script`、`game`、`defines`
-- **禁止在 `data` 阶段使用运行时 API**（如 `game`、`script`）
-- **禁止在 `control` 阶段操作 `data.raw`**
+存档加载顺序：`control.lua` → `on_init` → migrations → `on_load` → `on_configuration_changed` → 事件。
+`on_load` 中不能访问 `game`；`data` 在 control 阶段不可访问，不是“只读”。
 
-**为什么这很重要：**
-- Factorio 在不同阶段加载不同的 API
-- `data` 阶段只有原型定义 API，没有游戏运行时 API
-- `control` 阶段只有运行时 API，无法修改原型
-- 违反边界会导致 `nil` 错误或模组加载失败
+## 发布（高风险，不可逆）
 
-## Development Rules
+Mod Portal **不提供删除已发布版本**的 API。发布前必须显式授权，禁止用 release/tag 做“测试”。
 
-- 玩家可见文本必须同步维护到 `locale/`
-- 新增设置时同步补 `mod-setting-name` 与 `mod-setting-description`
-- 原型标识改动时，必须检查是否需要 `migrations/`
-- `control.lua` 应尽量薄，复杂运行时逻辑拆到 `scripts/`
-- 变更要优先考虑旧存档兼容与多人同步安全
+- tag 格式：`<mod-name>-v<major.minor.patch>`，版本必须与 `src/info.json` 一致
+- 首次创建 mod：`POST /api/v2/mods/init_publish`，token scope `ModPortal: Publish Mods`
+- 已有 mod 发新版本：`POST /api/v2/mods/releases/init_upload`，token scope `ModPortal: Upload Mods`
+- workflow 会自动查询 mod 是否存在并选择端点；版本已存在时跳过（幂等）
+- 发布 workflow 只在正式 release（非 prerelease）或手动输入 `PUBLISH` 时上传；手动触发必须指定 `target_mod`
+- `FACTORIO_TOKEN` 只能放在 GitHub Secrets，禁止写入仓库、日志、截图
 
-## 构建 & 验证
+## 验证（完成标准）
 
-- 打包全部模组：`python3 pack_mods.py`
-- 打包单个模组：`TARGET_MOD="<mod-name>" python3 pack_mods.py`
-- `info.json` 必需字段：`name`、`version`、`factorio_version`、`title`、`author`、`description`
-- 每个模组至少需要一个入口文件（`control`/`data`/`settings`）才能成功打包
-- 修改模组结构、打包脚本或发布流程后，至少重新验证一次打包
+```bash
+python3 verify_mod.py                 # 源码：字段/名称/版本/入口/changelog
+TARGET_MOD="<mod>" python3 pack_mods.py   # 打包到 dist/
+python3 verify_mod.py --zip-dir dist  # zip：根目录/必需文件/垃圾文件/版本一致
+```
 
-## 项目内工具
+只有以上命令全部通过，才算“改完”。CI 在 push/PR 时跑同一组检查（`.github/workflows/verify.yml`）。
 
-- `pack_mods.py`：统一打包入口；默认输出目录取 `MOD_OUTPUT_DIR`，未设置时为 `/home/factorio-mod-zips`；也支持 `TARGET_MOD` 单模组打包
-- `.github/workflows/publish-to-mod-portal.yml`：在 GitHub Release 创建时自动打包并发布到 Factorio Mod Portal
-- `.github/AI_RULES.md`：AI 助手必须遵守的强制性规范，包含 tag 格式、API 端点、目录结构等不可修改项
-- `docs/SETUP.md`：从零配置开发环境的完整指南
-- `docs/MOD_DEVELOPMENT.md`：模组开发规范、目录结构、命名规则
-- `docs/PUBLISHING.md`：手动与自动发布模组的详细流程
-- `docs/TROUBLESHOOTING.md`：常见问题排查指南
+## 禁止事项（没有明确授权时）
 
-## 环境配置
+- 不创建 release、不推 tag、不触发远端发布
+- 不把真实 token、密码、内部路径写入任何受版本控制的文件
+- 不发布 `example-mod/`
+- 不在 `data` 阶段使用运行时 API，不在 `control` 阶段访问 `data`
+- 不把 `AGENTS.md` 加入 `.gitignore`（它是项目规则，应提交）
 
-- `TARGET_MOD`：指定只打包某一个模组；为空时打包全部正式模组
-- `MOD_OUTPUT_DIR`：打包输出目录；脚本默认值为 `/home/factorio-mod-zips`
-- `FACTORIO_TOKEN`：发布到 Mod Portal 所需的 API Key（在 https://factorio.com/profile 生成，勾选 `ModPortal: Publish Mods`），配置为 GitHub Secret
-- CI 环境打包输出约定为 `dist/`，本地开发约定为 `/home/factorio-mod-zips/`
+## 按需文档
 
-## 约定 & 规范
+| 需要什么 | 读哪里 |
+|---|---|
+| 从零配置 | `docs/SETUP.md` |
+| 目录/命名/阶段细节 | `docs/MOD_DEVELOPMENT.md` |
+| 发布流程与排错 | `docs/PUBLISHING.md` |
+| 安全与误发布风险 | `docs/SECURITY_AND_PITFALLS.md` |
+| 报错排查 | `docs/TROUBLESHOOTING.md` |
+| 强制规范全文 | `.github/AI_RULES.md` |
+| CI 行为 | `.github/workflows/README.md` |
 
-- 文档优先级：`.github/AI_RULES.md` > `CONTRIBUTING.md` > `README.md` > 本文件
-- 发布 tag 格式固定为 `<mod-name>-v<version>`，不要改动
-- 发布 API 端点固定为 `https://mods.factorio.com/api/v2/mods/init_publish`，不要改成 `init_upload`
-- 已定义环境变量名称 `TARGET_MOD`、`MOD_OUTPUT_DIR`、`FACTORIO_TOKEN` 不要改名
-- `settings*` 只定义设置；`data*` 只处理原型与 `data.raw`；`control.lua` / `scripts/` 只处理运行时 API
-- 玩家可见文本要同步维护到 `locale/`；新增设置时同步补 `mod-setting-name` 与 `mod-setting-description`
-- 不要把 zip、日志、截图、临时脚本直接堆在仓库根目录；产物和调试输出优先放到 `artifacts/` 或 `dist/`
-- 本地缓存目录如 `.local/`、`.sisyphus/`、`.codex/` 不应成为正式产物的一部分
+## 已知决策
 
-## 已知问题 & 决策记录
-
-- `example-mod/` 是模板自带的示例模组，不是正式交付内容。它用于展示结构，用户克隆后应删除或替换为自己的模组
-- 打包输出目录在本地（`/home/factorio-mod-zips/`）与 CI（`dist/`）不一致，这是有意为之：本地固定路径方便测试，CI 临时目录避免残留
-- 双语文档（中文为主、英文翻译）采用独立文件方案（`*.en.md`）而非 i18n 目录，简化 GitHub 渲染和贡献流程
-- 模板不含 headless smoke test 工作流，因为不同模组的验证需求差异大；需要 smoke test 的项目可自行添加 GitHub Actions workflow，或在 Factorio Modding 社区查找现成方案
+- 默认输出 `dist/`（不是固定绝对路径），本地与 CI 一致
+- `example-mod/` 仅用于展示结构，默认排除发布
+- 双语采用 `*.en.md` 独立文件，中文为 canonical；英文翻译滞后时以中文为准
+- 模板不内置 headless smoke test；需要时用 `--mod-directory` + `--create`/`--dump-data` 或社区 FactorioTest

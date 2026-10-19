@@ -61,11 +61,11 @@ cp -r example-mod/ my-awesome-mod/
 - `control.lua` - 运行时逻辑
 - `locale/` - 本地化文本
 
-### 4. 测试打包
+### 4. 本地验证与打包
 
 ```bash
+python3 verify_mod.py
 export TARGET_MOD="my-awesome-mod"
-export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
@@ -81,6 +81,7 @@ python3 pack_mods.py
 git tag my-awesome-mod-v1.0.0
 git push origin my-awesome-mod-v1.0.0
 
+# ⚠️ 这会真实发布到 Mod Portal，已发布版本不可删除
 gh release create my-awesome-mod-v1.0.0 \
   --title "My Awesome Mod v1.0.0" \
   --notes "Initial release"
@@ -124,7 +125,7 @@ gh release create my-awesome-mod-v1.0.0 \
 ### 版本管理
 
 - 使用语义化版本号：`major.minor.patch`
-- 每次发布前更新 `info.json` 和 `changelog.txt`
+- 每次发布前更新 `info.json`；`changelog.txt` 推荐更新但非必需
 - Tag 格式：`<mod-name>-v<version>`
 
 ### 代码组织
@@ -166,13 +167,17 @@ git push origin mod-a-v1.0.0
 
 只会打包和发布 `mod-a`，不影响其他模组。
 
-### 同时发布多个模组
+### 手动触发一次发布
 
-手动触发 workflow 会打包并发布所有模组：
+手动触发只处理 `target_mod` 指定的一个模组，默认是 dry-run；只有 `confirm` 输入 `PUBLISH` 时才会上传：
 
 ```bash
-gh workflow run publish-to-mod-portal.yml
+gh workflow run publish-to-mod-portal.yml \
+  -f target_mod=mod-a \
+  -f confirm=PUBLISH
 ```
+
+省略 `confirm` 时只打包并上传 artifact，不会发布到 Mod Portal。
 
 ## AI 协作规范
 
@@ -183,7 +188,7 @@ gh workflow run publish-to-mod-portal.yml
 - 不要修改核心命名规范（tag 格式、目录结构）
 - 不要修改 API 端点和环境变量名称
 - 严格遵守 Factorio 阶段边界规则
-- 修改后必须测试打包和发布
+- 修改后必须本地验证（`python3 verify_mod.py` + `python3 pack_mods.py`）；发布仅在明确授权后执行
 
 ### 阶段边界
 
@@ -191,7 +196,7 @@ gh workflow run publish-to-mod-portal.yml
 
 - `settings.lua`: 只定义设置，不能使用 `game`/`script`
 - `data.lua`: 只定义原型，不能使用 `game`/`script`
-- `control.lua`: 只处理运行时，不能修改 `data.raw`
+- `control.lua`: 只处理运行时；`data` 全局在此阶段不可访问，原型已锁定
 
 违反这些规则会导致运行时错误。
 

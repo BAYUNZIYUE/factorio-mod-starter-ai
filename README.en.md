@@ -55,21 +55,42 @@ Update `info.json`:
 }
 ```
 
-### 3. Test Packaging
+Current stable Factorio is 2.0.x; 2.1 is still experimental. `factorio_version` accepts a single major version such as `"2.0"`, and a 2.0 mod does not load automatically in 2.1.
+
+### 3. Verify and Package Locally
 
 ```bash
-export TARGET_MOD="my-awesome-mod"
-export MOD_OUTPUT_DIR="./dist"
+# Validate info.json, entrypoints, and layout
+python3 verify_mod.py
+
+# Package into dist/ at the repository root
 python3 pack_mods.py
 ```
 
-### 4. Configure GitHub
+The archive is written to `dist/<name>_<version>.zip`. The `name_version/` root folder inside the zip is a template convention; Mod Portal only enforces the zip filename format `{name}_{version}.zip`. Local development stops here; no `FACTORIO_TOKEN` is needed.
 
-1. Create GitHub repository
-2. Configure `FACTORIO_TOKEN` Secret (see [Setup Guide](docs/SETUP.en.md))
-3. Push code
+### 4. Push Your Code
 
-### 5. Publish
+Create the GitHub repository and push the project. You do not need to configure secrets yet.
+
+---
+
+## 🔐 Before Your First Real Publish
+
+1. Go to https://factorio.com/profile
+2. Generate an API key and enable the scopes you need:
+   - `ModPortal: Publish Mods` (create a new mod)
+   - `ModPortal: Upload Mods` (upload a new version of an existing mod)
+   - `ModPortal: Edit Mods` (edit mod details, if needed)
+3. Add the GitHub secret `FACTORIO_TOKEN`
+
+> ⚠️ **Once a real `FACTORIO_TOKEN` is configured, creating a release publishes to Mod Portal for real, and published versions cannot be deleted.** Do not configure this secret during development.
+
+---
+
+## 🚀 Publish
+
+> ⚠️ **This publishes to Mod Portal for real and versions cannot be deleted.** Confirm the mod name, version, and contents, and run `python3 verify_mod.py --target <mod-name> --tag <tag>` first. The tag version must match `info.json.version`.
 
 ```bash
 git tag my-awesome-mod-v1.0.0
@@ -79,6 +100,8 @@ gh release create my-awesome-mod-v1.0.0 \
   --title "My Awesome Mod v1.0.0" \
   --notes "Initial release"
 ```
+
+The workflow detects whether the mod already exists on Mod Portal: it calls `init_publish` for a new mod and `releases/init_upload` for an existing one.
 
 ---
 
@@ -94,7 +117,7 @@ gh release create my-awesome-mod-v1.0.0 \
 
 - ⚠️ AI might accidentally trigger releases
 - ⚠️ Test locally without configuring `FACTORIO_TOKEN`
-- ⚠️ Manually publish first version to verify everything works
+- ⚠️ Verify name, version, and contents before the first real publish; a release publishes immediately
 - ⚠️ Explicitly tell AI "do not create releases" during testing
 
 See [Publishing Guide](docs/PUBLISHING.en.md) for detailed warnings and safe practices.
@@ -108,25 +131,19 @@ factorio-mod-starter-ai/
 ├── .github/
 │   ├── AI_RULES.md              # AI collaboration rules (MANDATORY)
 │   └── workflows/
-│       └── publish-to-mod-portal.yml  # Auto-publish workflow
-├── docs/
-│   ├── SETUP.md                 # Environment setup
-│   ├── MOD_DEVELOPMENT.md       # Development specs & stage boundaries
-│   ├── PUBLISHING.md            # Publishing workflow
-│   ├── SECURITY_AND_PITFALLS.md # Security & common pitfalls
-│   └── TROUBLESHOOTING.md       # Common issues & solutions
-├── example-mod/                 # Example mod
+│       ├── verify.yml           # push/PR validation + packaging
+│       └── publish-to-mod-portal.yml  # Publish workflow
+├── docs/                        # Chinese docs (English is *.en.md)
+├── example-mod/                 # Example mod (delete when starting)
 │   └── src/
-│       ├── info.json            # Mod metadata
-│       ├── settings.lua         # Settings stage
-│       ├── data.lua             # Data stage
-│       ├── control.lua          # Control stage
-│       ├── changelog.txt
-│       └── locale/en/locale.cfg
-├── pack_mods.py                 # Packaging script
-├── AGENTS.md                    # Repository boundary rules
-├── CONTRIBUTING.md              # Contribution guide
-└── README.md                    # This file
+├── scripts/
+│   └── publish_mod.py           # Mod Portal publishing script
+├── mod_utils.py                 # Shared validation/packaging logic
+├── verify_mod.py                # Validation entry point
+├── pack_mods.py                 # Packaging entry point
+├── AGENTS.en.md                 # Repository rules entry point
+├── CONTRIBUTING.en.md           # Contribution guide
+└── README.en.md                 # This file
 ```
 
 ---
@@ -173,15 +190,17 @@ factorio-mod-starter-ai/
 
 ### Control Stage (`control.lua`, `scripts/`)
 
-**Can use:**
-- `script` (event registration)
-- `game` (game state access)
-- `remote` (inter-mod communication)
+Only `script`, `remote`, and `commands` are available at the top level of `control.lua`. `game` and `rendering` are **not** available there; use them only inside `on_init`, `on_configuration_changed`, or event callbacks.
+
+**Available in the control stage:**
+- `script` (event registration; top level)
+- `remote` (inter-mod communication; top level)
+- `commands` (custom console commands; top level)
+- `game`, `rendering` (inside callbacks only)
 - `settings.global`, `settings.player` (runtime settings)
 
-**Cannot use:**
-- `data:extend` (prototypes are locked)
-- `data.raw` modifications (read-only)
+**Not available:**
+- `data` (the `data` global is inaccessible in the control stage — it is not "read-only", it simply does not exist there; prototypes are locked)
 
 **Common errors:**
 
@@ -253,7 +272,7 @@ This template is designed to work well with AI-assisted development and clear re
 ### Common AI Mistakes to Watch For
 
 - ❌ Using `game` API in data stage
-- ❌ Modifying `data.raw` in control stage
+- ❌ Accessing `data` in the control stage
 - ❌ Creating releases during testing
 - ❌ Incorrect tag format
 
@@ -282,15 +301,27 @@ git push origin my-new-mod-v1.0.0
 
 Only `my-new-mod` will be packaged and published.
 
-### Publish All Mods
+### Publish Multiple Mods
 
-Manually trigger workflow:
+One release publishes one mod. For multiple mods, create one release per mod:
+
+1. bump `info.json` for each mod (and update `changelog.txt`) and commit
+2. create a tag/release per mod, e.g. `mod-a-v1.1.0`, `mod-b-v2.0.0`
+3. each release triggers its own workflow run for that mod only
+4. confirm each run under Actions
+
+To rehearse without publishing, dispatch with a target and leave `confirm`
+empty (package only):
 
 ```bash
-gh workflow run publish-to-mod-portal.yml
+gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a
 ```
 
-All mods will be packaged and published.
+Then upload after checking the artifact:
+
+```bash
+gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a -f confirm=PUBLISH
+```
 
 ---
 
@@ -328,6 +359,8 @@ example-mod_1.0.0/
 ├── changelog.txt
 └── locale/en/locale.cfg
 ```
+
+The `name_version/` root folder inside the zip is a template convention. Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
 
 ---
 

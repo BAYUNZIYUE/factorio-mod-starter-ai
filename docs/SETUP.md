@@ -64,6 +64,8 @@ example-mod_1.0.0/
         └── locale.cfg
 ```
 
+zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文件名格式 `{name}_{version}.zip`。
+
 ## 配置 Factorio API Key
 
 在继续之前，建议先阅读：[安全与踩坑总结](SECURITY_AND_PITFALLS.md)。
@@ -81,7 +83,9 @@ example-mod_1.0.0/
 3. 滚动到 "API Keys" 部分
 4. 点击 "Generate new API key"
 5. 勾选权限：
-   - ✅ `ModPortal: Publish Mods`
+   - ✅ `ModPortal: Publish Mods`（首次创建新模组）
+   - ✅ `ModPortal: Upload Mods`（给已存在的模组发布新版本）
+   - ✅ `ModPortal: Edit Mods`（如需修改模组详情）
 6. 点击 "Create"
 7. 复制生成的 API Key（只显示一次，请妥善保存）
 
@@ -97,24 +101,14 @@ example-mod_1.0.0/
 
 ### 3. 验证配置
 
-创建一个测试 release 来验证配置：
+**不要用 release/tag 来验证配置。** 本地运行 `python3 pack_mods.py` + `python3 verify_mod.py` 即可完成验证。release 一旦触发就会真实发布，且 Mod Portal 版本不可删除。
 
 ```bash
-# 确保 info.json 中的版本是 1.0.0
-git tag example-mod-v1.0.0
-git push origin example-mod-v1.0.0
-
-# 创建 release
-gh release create example-mod-v1.0.0 \
-  --title "Example Mod v1.0.0" \
-  --notes "Initial release"
+python3 verify_mod.py    # 校验 info.json、入口与目录结构
+python3 pack_mods.py     # 输出到 dist/
 ```
 
-检查 GitHub Actions 是否成功运行：
-
-1. 访问仓库的 "Actions" 标签
-2. 查看 "Publish to Factorio Mod Portal" workflow
-3. 确认所有步骤都成功（绿色勾号）
+确认 zip 生成且内容正确后，再为正式发布配置 Secret。
 
 ## 环境变量说明
 
@@ -122,9 +116,9 @@ gh release create example-mod-v1.0.0 \
 
 打包输出目录。
 
-- 默认值：`/home/factorio-mod-zips`
-- CI 环境：`${{ github.workspace }}/dist`
-- 本地开发：`./dist`
+- 默认值：`dist`（仓库根目录下）
+- 可按需覆盖，例如 `export MOD_OUTPUT_DIR="./out"`
+- CI 环境同样使用 `dist/`
 
 ### TARGET_MOD
 
@@ -196,13 +190,13 @@ example-mod: info.json 缺少字段: author, description
 错误信息：
 
 ```
-❌ init_upload failed (HTTP 401)
+❌ init_publish/init_upload failed (HTTP 401)
 ```
 
 解决方案：
 
 1. 确认已在 GitHub 仓库设置中添加 `FACTORIO_TOKEN` Secret
-2. 确认 API Key 有 `ModPortal: Publish Mods` 权限
+2. 确认 API Key 已勾选 `ModPortal: Publish Mods` 与 `ModPortal: Upload Mods` 权限
 3. 确认 API Key 未过期
 
 ### 首次发布失败：模组不存在
@@ -216,13 +210,9 @@ example-mod: info.json 缺少字段: author, description
 
 解决方案：
 
-首次发布新模组时，需要先在 Mod Portal 手动创建模组页面：
-
-1. 访问 https://mods.factorio.com/
-2. 登录你的账号
-3. 点击 "Upload mod"
-4. 填写模组信息并上传第一个版本
-5. 之后可以使用自动发布系统
+- 首次发布新模组时，workflow 会自动调用 `init_publish` 创建模组页面，无需手动创建。
+- 若仍报 `Mod does not exist`，通常说明当前走的是 `releases/init_upload`（仅适用于已存在的模组），或 Token 缺少对应权限（`Publish Mods` / `Upload Mods`）。请检查 Token 权限后重试。
+- 作为兜底，也可以在 https://mods.factorio.com/ 手动点击 "Upload mod" 创建页面并上传第一个版本。
 
 ## 下一步
 

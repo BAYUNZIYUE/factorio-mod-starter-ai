@@ -20,7 +20,7 @@ Each mod should use the following layout:
     ├── data-final-fixes.lua
     ├── settings-updates.lua
     ├── settings-final-fixes.lua
-    ├── changelog.txt
+    ├── changelog.txt              # recommended, not required
     ├── thumbnail.png
     ├── locale/
     │   ├── en/
@@ -30,8 +30,13 @@ Each mod should use the following layout:
     ├── graphics/
     ├── sounds/
     ├── prototypes/
-    └── scripts/
+    ├── scripts/
+    └── migrations/                # save migrations (optional)
 ```
+
+`info.json` is the only mandatory file; add other entry files as needed. `changelog.txt` is recommended but optional.
+
+Factorio only loads `.lua` entry files. If you use TypeScript, compile it to `.lua` with TypeScriptToLua first; this template does not include that toolchain.
 
 ## Required `info.json` Fields
 
@@ -51,7 +56,7 @@ Field meanings:
 
 - `name`: internal mod identifier; must match the directory name and use kebab-case
 - `version`: semantic version (`major.minor.patch`)
-- `factorio_version`: minimum supported Factorio version
+- `factorio_version`: target Factorio major version; use a single major version such as `"2.0"`. Current stable is 2.0.x and 2.1 is still experimental; a 2.0 mod does not load automatically in 2.1
 - `title`: player-visible mod title
 - `author`: author name
 - `description`: short description
@@ -59,7 +64,7 @@ Field meanings:
 
 ## Factorio Stage Boundaries
 
-Factorio mod loading is split into three major stages, and each stage has different APIs. **Breaking stage boundaries causes runtime errors.**
+Factorio loading is not just three stages. Settings and Data run first; after prototypes are locked the control stage begins, and inside it the callbacks run in a defined order. Each stage exposes different APIs. **Breaking stage boundaries causes runtime errors.**
 
 ### Stage Order
 
@@ -67,10 +72,31 @@ Factorio mod loading is split into three major stages, and each stage has differ
 Game starts
   ↓
 1. Settings stage
+   - settings.lua
+   - settings-updates.lua
+   - settings-final-fixes.lua
+  ↓
 2. Data stage
-3. Prototype lock (`data.raw` becomes effectively read-only at runtime)
-4. Control stage
-5. Runtime events
+   - data.lua
+   - data-updates.lua
+   - data-final-fixes.lua
+  ↓
+3. Prototype lock (prototypes can no longer be modified)
+  ↓
+4. Control stage: control.lua is loaded
+   - only script, remote, commands are available at the top level
+   - game and rendering are not available at the top level
+  ↓
+5. on_init (new save only)
+  ↓
+6. migrations (loading a save from an older mod version)
+   - src/migrations/<mod-version>.lua
+  ↓
+7. on_load (every save load)
+  ↓
+8. on_configuration_changed (mod or game version changed)
+  ↓
+9. Runtime events
 ```
 
 ### Settings Stage
@@ -101,16 +127,18 @@ Forbidden:
 
 Purpose: runtime logic and event handling.
 
-Allowed:
-- `script`
-- `game`
-- `remote`
-- `rendering`
-- `settings.global`, `settings.player`
+Available APIs (note where they are available):
+
+- top level: `script`, `remote`, `commands`
+- inside callbacks only (`on_init`, `on_configuration_changed`, event handlers): `game`, `rendering`
+- runtime settings: `settings.global`, `settings.player`
 
 Forbidden:
-- `data:extend`
-- mutating `data.raw`
+
+- using `game` or `rendering` at the top level of `control.lua`
+- accessing the `data` global (it is inaccessible in the control stage; prototypes are locked)
+
+Only `script`, `remote`, and `commands` may be used at the top level. Any logic that needs `game` must live inside `on_init`, `on_configuration_changed`, or an event callback.
 
 ## Common Errors and Fixes
 
@@ -120,9 +148,11 @@ Typical error: `attempt to index global 'game' (a nil value)`
 
 Fix: move runtime logic to `control.lua`.
 
-### Error 2: mutating prototypes in the control stage
+### Error 2: accessing `data` in the control stage
 
-Typical error: `data.raw is read-only`
+Typical error: `attempt to index global 'data' (a nil value)`
+
+Cause: the `data` global only exists during the data stage. It is not readable in the control stage (it is not merely read-only), and prototypes are locked.
 
 Fix: move prototype changes into `data.lua` or `data-final-fixes.lua`.
 
@@ -219,7 +249,16 @@ Check optional dependencies in code with `mods["optional-mod"]`.
 
 ## Save Compatibility
 
-If you rename prototypes, consider adding `migrations/` scripts.
+If you rename prototypes, add a migration under `src/migrations/`:
+
+```text
+<mod-name>/
+└── src/
+    └── migrations/
+        └── <mod-version>.lua
+```
+
+For example, upgrading the mod from `1.0.0` to `1.1.0` means `src/migrations/1.1.0.lua`. The filename is the **mod version** (`info.json.version`), not the Factorio version. Factorio runs migration files whose version is newer than the mod version recorded in the save.
 
 Also initialize global state with `script.on_init(...)` and handle upgrades with `script.on_configuration_changed(...)`.
 

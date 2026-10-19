@@ -63,10 +63,11 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 **解决方案**:
 
-至少创建一个入口文件：
-- `control.lua` 或 `control.ts`
-- `data.lua` 或 `data.ts`
-- `settings.lua` 或 `settings.ts`
+至少创建一个入口文件（必须是 `.lua`；Factorio 不加载 `.ts`，如使用 TypeScript 需先用 TypeScriptToLua 编译为 `.lua`）：
+
+- `control.lua`
+- `data.lua`
+- `settings.lua`
 
 ## 发布问题
 
@@ -74,7 +75,7 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 **错误信息**:
 ```
-❌ init_upload failed (HTTP 401)
+❌ init_publish/init_upload failed (HTTP 401)
 ```
 
 **原因**: GitHub Secret `FACTORIO_TOKEN` 未配置或无效
@@ -82,7 +83,7 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 **解决方案**:
 
 1. 访问 https://factorio.com/profile
-2. 生成新的 API Key，勾选 `ModPortal: Publish Mods` 权限
+2. 生成新的 API Key，勾选 `ModPortal: Publish Mods` 与 `ModPortal: Upload Mods`（如需修改详情再加 `ModPortal: Edit Mods`）
 3. 在 GitHub 仓库设置中添加 Secret：
    - Name: `FACTORIO_TOKEN`
    - Value: 你的 API Key
@@ -95,23 +96,25 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 {"error": "Mod does not exist"}
 ```
 
-**原因**: 首次发布新模组时，Mod Portal 上还没有该模组页面
+**原因**: 当前走的是 `releases/init_upload`（只适用于已存在的模组），或 Token 缺少对应权限（`Publish Mods` / `Upload Mods`）
 
 **解决方案**:
 
-首次发布需要手动创建模组页面：
+- 首次发布新模组时，workflow 会自动调用 `init_publish` 创建页面，不需要手动创建。
+- 若仍报此错误，先检查 Token 权限；确认后再重试。
+- 兜底方案是手动创建页面并上传第一个版本：
 
-1. 本地打包模组：
+1. 本地验证并打包模组：
    ```bash
+   python3 verify_mod.py
    export TARGET_MOD="your-mod"
-   export MOD_OUTPUT_DIR="./dist"
    python3 pack_mods.py
    ```
 
 2. 访问 https://mods.factorio.com/
 3. 登录并点击 "Upload mod"
 4. 填写模组信息并上传 zip 文件
-5. 后续版本可以使用自动发布系统
+5. 后续版本会走 `releases/init_upload` 自动发布
 
 ### 问题 3: Tag 格式错误
 
@@ -139,17 +142,15 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 ### 问题 4: 版本号不一致
 
-**错误信息**:
+Workflow 不会自动检查版本一致性。发布前运行：
+
+```bash
+python3 verify_mod.py --target <mod-name> --tag <tag>
 ```
-❌ Upload response indicates failure:
-{"error": "Version mismatch"}
-```
 
-**原因**: Tag 中的版本号与 `info.json` 中的版本号不一致
+该脚本会校验 tag 中的模组名/版本与 `info.json` 是否一致。两者不一致时不要创建 release。
 
-**解决方案**:
-
-确保两处版本号一致：
+示例：
 
 - Tag: `example-mod-v1.0.1`
 - `info.json`: `"version": "1.0.1"`
@@ -197,9 +198,9 @@ script.on_event(defines.events.on_player_created, function(event)
 end)
 ```
 
-### 错误 2: data.raw is read-only
+### 错误 2: attempt to index global 'data' (a nil value)
 
-**原因**: 在 control 阶段尝试修改原型
+**原因**: 在 control 阶段访问 `data`。`data` 全局只在 data 阶段存在，control 阶段不可访问（不是“只读”），原型已锁定。
 
 **示例**:
 ```lua
@@ -332,7 +333,7 @@ end)
 
 **解决方案**:
 
-创建 `migrations/<version>.lua`：
+创建 `src/migrations/<mod-version>.lua`（文件名是模组版本号，不是 Factorio 版本号）：
 
 ```lua
 for _, surface in pairs(game.surfaces) do

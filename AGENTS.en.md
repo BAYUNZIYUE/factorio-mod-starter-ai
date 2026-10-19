@@ -1,129 +1,122 @@
-# AGENTS.md - Factorio Mod Template Repository Rules
+# AGENTS.md — Factorio Mod Starter AI
 
 [简体中文](AGENTS.md) | **English**
 
-This file is the project-level persistent memory for this repository. This is a **Factorio mod development template repository** designed to help developers build and publish Factorio mods with AI assistance. New sessions entering the repository should read this file first, then `.github/AI_RULES.md` and the documents under `docs/`.
+This file is the single entry point for repository rules. Keep it short.
+Read files under `docs/` only when needed; do not preload all documentation.
 
-> **After cloning**: If you create your own mod project from this template, add this file (`AGENTS.md`) to `.gitignore` after cloning. In the template repository, AGENTS.md is a deliverable (version-controlled). In a concrete mod project, however, it is local, per-instance memory that should not sync across instances — your build environment, debugging experience, and project decisions should not be accidentally committed to Git history.
+## What this repository is
 
-## Project Overview
+A **Factorio mod development template**: multi-mod layout, packaging script,
+GitHub Actions publishing, and AI collaboration constraints.
+It is not a mod project. When you create a project from it, keep `AGENTS.md`
+(it should be committed) and delete `example-mod/`.
 
-This is a **Factorio mod development template repository**, not a specific mod project.
+Template vs. instance repository:
 
-It provides:
-- A complete multi-mod workspace structure
-- Automated packaging script (`pack_mods.py`) and GitHub Actions publishing workflow
-- AI collaboration rules (`.github/AI_RULES.md`) and repository boundary rules (this file)
-- Development guides and best-practice documentation (`docs/`)
-- Bilingual support (Chinese/English docs, README, contribution guide)
+| Role | Location | Committed? |
+|---|---|---|
+| Project rules | `AGENTS.md` / `.github/AI_RULES.md` | yes |
+| Personal environment notes (local paths, tokens, debugging notes) | `AGENTS.local.md` (if supported) or an untracked local file | no |
+| Build output | `dist/` | no (already in `.gitignore`) |
 
-When creating a new project from this template, clone the repository and delete `example-mod/` to start developing.
-
-## Tech Stack
-
-- Factorio 2.0 mod development, primarily Lua with `*.lua` / `*.ts` entry point conventions
-- Python 3 packaging script: `pack_mods.py`
-- GitHub Actions: `.github/workflows/publish-to-mod-portal.yml` (auto-publish to Mod Portal)
-- Documentation format: Markdown (Chinese/English bilingual)
-
-## Packaging Boundary
-
-- Only root-level directories containing `src/info.json` are treated as packageable mods
-- The packaging entry script is the repository root `pack_mods.py`
-- The default packaging output directory is `/home/factorio-mod-zips/`, overridable with `MOD_OUTPUT_DIR`
-- The sample mod `example-mod/` is for reference only and should be deleted or replaced in real projects
-
-## Required Mod Layout
-
-Each formal mod should use the following structure:
+## Layout
 
 ```text
 <mod-name>/
-├── README.md
-└── src/
-    ├── info.json
-    ├── control.lua / control.ts
-    ├── data.lua / data.ts
-    ├── settings.lua / settings.ts
-    ├── settings-updates.lua / settings-final-fixes.lua
-    ├── data-updates.lua / data-final-fixes.lua
-    ├── locale/
-    ├── scripts/
-    ├── prototypes/
-    └── changelog.txt
+├── src/
+│   ├── info.json              # the only mandatory file
+│   ├── control.lua            # runtime; top level has script/remote/commands only
+│   ├── data.lua               # prototypes; data-updates.lua / data-final-fixes.lua
+│   ├── settings.lua           # settings; settings-updates.lua / settings-final-fixes.lua
+│   ├── locale/<lang>/locale.cfg
+│   ├── migrations/<mod-version>.lua   # filename is the MOD version
+│   ├── scripts/               # runtime helpers
+│   ├── prototypes/
+│   ├── graphics/
+│   └── changelog.txt          # recommended, not required
+└── README.md
 ```
 
-## Architecture Guide
+Hard rules:
 
-- `pack_mods.py` scans all root-level directories containing `src/info.json` and treats them as packageable mods
-- Formal mods must be at the repository root using the `<mod-name>/src/` structure; the directory name should match the `name` field in `src/info.json`
-- `example-mod/` is a sample shipped with the template, demonstrating the complete `<mod>/src/` structure and a minimal runnable entry point
-- The template itself contains no actual mod business code; after cloning, users delete `example-mod/` and create their own mods following `<mod-name>/src/info.json`
-- `.github/workflows/publish-to-mod-portal.yml` handles automatic publishing; `.github/AI_RULES.md` is the mandatory AI collaboration specification
+- Directory name must equal `src/info.json` `name` (lowercase letters, digits,
+  `-`, `_`, 3–50 characters)
+- `version` must be `major.minor.patch`; `factorio_version` must be a two-part
+  major version such as `"2.0"`
+- Only `.lua` entrypoints are loaded. TypeScript must be compiled to `.lua`
+  first with TypeScriptToLua; this template does not ship a build chain
+- Only files under `src/` are packaged. Build output, temp files, `.git`,
+  `node_modules`, `__pycache__`, `.DS_Store` are excluded
+- `example-mod/` is excluded from packaging unless you pass
+  `TARGET_MOD=example-mod` explicitly
 
-## Factorio Stage Boundaries
+## Stage boundaries (violating these breaks loading)
 
-These are critical rules. Violating them causes runtime errors.
+| Stage | Allowed | Forbidden |
+|---|---|---|
+| `settings*` | `data:extend` setting prototypes, `settings.startup` | `game`, `script`, runtime API |
+| `data*` | `data:extend`, `data.raw`, prototype definitions/edits, `settings.startup` | `game`, `script`, `remote`, event registration |
+| `control.lua` top level | `script`, `remote`, `commands` | `game`, `rendering`, `data` (does not exist) |
+| Event handlers / `on_init` / `on_configuration_changed` | full runtime API, `game`, `rendering` | mutating prototypes (locked) |
 
-- `settings*`: settings definitions only (`data:extend` for settings prototypes)
-- `data*`: prototype definition and modification only (`data:extend`, `data.raw`)
-- `control.lua` / `scripts/`: runtime API only (`script`, `game`, `defines`, etc.)
-- **Never use runtime APIs in the `data` stage**
-- **Never modify `data.raw` in the `control` stage**
+Save load order: `control.lua` → `on_init` → migrations → `on_load` →
+`on_configuration_changed` → event handlers.
+`on_load` cannot access `game`; `data` is **not accessible** in the control
+stage (it is not "read-only").
 
-Why this matters:
-- Factorio exposes different APIs in different load stages
-- The `data` stage has prototype APIs only, not gameplay runtime APIs
-- The `control` stage has runtime APIs only and cannot redefine prototypes
-- Violating these boundaries leads to `nil` errors or load failures
+## Publishing (high risk, irreversible)
 
-## Development Rules
+The Mod Portal has **no API to delete a published release**. Publishing requires
+explicit authorization; never use a release/tag as a "test".
 
-- Keep all player-facing text synchronized in `locale/`
-- When adding settings, also add `mod-setting-name` and `mod-setting-description`
-- When changing prototype identifiers, check whether `migrations/` is required
-- Keep `control.lua` thin; move complex runtime logic to `scripts/`
-- Prioritize old-save compatibility and multiplayer determinism
+- Tag format: `<mod-name>-v<major.minor.patch>`, must match `src/info.json`
+- First-time mod creation: `POST /api/v2/mods/init_publish`, token scope
+  `ModPortal: Publish Mods`
+- New release of an existing mod: `POST /api/v2/mods/releases/init_upload`,
+  token scope `ModPortal: Upload Mods`
+- The workflow checks whether the mod exists and picks the right endpoint;
+  it skips versions that already exist (idempotent)
+- It uploads only on a non-prerelease `release`, or on manual dispatch with
+  `confirm=PUBLISH` and an explicit `target_mod`
+- `FACTORIO_TOKEN` belongs in GitHub Secrets only; never commit it or print it
 
-## Build & Verification
+## Verification (definition of done)
 
-- Package all mods: `python3 pack_mods.py`
-- Package a single mod: `TARGET_MOD="<mod-name>" python3 pack_mods.py`
-- Required `info.json` fields: `name`, `version`, `factorio_version`, `title`, `author`, `description`
-- Each mod needs at least one entry point (`control`/`data`/`settings`) to package successfully
-- After changing mod structure, packaging script, or publishing flow, re-verify packaging at minimum
+```bash
+python3 verify_mod.py                       # source: fields/name/version/entrypoint/changelog
+TARGET_MOD="<mod>" python3 pack_mods.py     # package into dist/
+python3 verify_mod.py --zip-dir dist        # zip: root dir/required files/junk/version
+```
 
-## Project Tools
+A change is done only when all three pass. CI runs the same checks on push/PR
+(`.github/workflows/verify.yml`).
 
-- `pack_mods.py`: Unified packaging entry point; default output at `MOD_OUTPUT_DIR`, fallback to `/home/factorio-mod-zips`; supports `TARGET_MOD` for single-mod packaging
-- `.github/workflows/publish-to-mod-portal.yml`: Auto-packages and publishes to Factorio Mod Portal when a GitHub Release is created
-- `.github/AI_RULES.md`: Mandatory rules for AI assistants, covering tag format, API endpoint, directory structure, and other non-negotiable items
-- `docs/SETUP.md`: Complete guide for setting up a development environment from scratch
-- `docs/MOD_DEVELOPMENT.md`: Mod development conventions, directory structure, and naming rules
-- `docs/PUBLISHING.md`: Detailed workflow for manual and automatic mod publishing
-- `docs/TROUBLESHOOTING.md`: Common issue troubleshooting guide
+## Do not (without explicit authorization)
 
-## Environment Configuration
+- Create a release, push a tag, or trigger a remote publish
+- Write real tokens, passwords, or internal paths into tracked files
+- Publish `example-mod/`
+- Use runtime APIs in the `data` stage, or access `data` in the `control` stage
+- Add `AGENTS.md` to `.gitignore` (it is project rule, not local state)
 
-- `TARGET_MOD`: Package only the specified mod; when empty, package all formal mods
-- `MOD_OUTPUT_DIR`: Packaging output directory; script default is `/home/factorio-mod-zips`
-- `FACTORIO_TOKEN`: API key required for publishing to Mod Portal (generate at https://factorio.com/profile, enable `ModPortal: Publish Mods`), configured as a GitHub Secret
-- CI output convention is `dist/`; local development convention is `/home/factorio-mod-zips/`
+## Documentation on demand
 
-## Conventions & Standards
+| Need | Read |
+|---|---|
+| Setup from scratch | `docs/SETUP.en.md` |
+| Layout/naming/stage details | `docs/MOD_DEVELOPMENT.en.md` |
+| Publishing and troubleshooting | `docs/PUBLISHING.en.md` |
+| Security and mis-publish risks | `docs/SECURITY_AND_PITFALLS.en.md` |
+| Error lookup | `docs/TROUBLESHOOTING.en.md` |
+| Full mandatory rules | `.github/AI_RULES.en.md` |
+| CI behavior | `.github/workflows/README.en.md` |
 
-- Document priority: `.github/AI_RULES.md` > `CONTRIBUTING.md` > `README.md` > this file
-- Release tag format is fixed as `<mod-name>-v<version>`; do not modify
-- Publishing API endpoint is fixed as `https://mods.factorio.com/api/v2/mods/init_publish`; do not change to `init_upload`
-- Environment variable names `TARGET_MOD`, `MOD_OUTPUT_DIR`, `FACTORIO_TOKEN` must not be renamed
-- `settings*` defines settings only; `data*` handles prototypes and `data.raw` only; `control.lua` / `scripts/` handles runtime API only
-- Keep player-facing text in `locale/`; when adding settings, also add `mod-setting-name` and `mod-setting-description`
-- Do not dump zip files, logs, screenshots, or temporary scripts in the repository root; put outputs under `artifacts/` or `dist/`
-- Local cache directories like `.local/`, `.sisyphus/`, `.codex/` should never become deliverables
+## Known decisions
 
-## Known Issues & Design Decisions
-
-- `example-mod/` is a sample mod shipped with the template, not a deliverable. It demonstrates structure; users should delete or replace it after cloning
-- Local packaging output (`/home/factorio-mod-zips/`) and CI output (`dist/`) intentionally differ: the fixed local path simplifies testing, while the CI temp directory avoids residue
-- Bilingual documentation (Chinese primary, English translation) uses separate files (`*.en.md`) rather than an i18n directory to simplify GitHub rendering and contribution workflows
-- The template does not include a headless smoke test workflow, as verification needs vary widely across mods; projects needing smoke tests can add their own GitHub Actions workflow or consult the Factorio modding community for existing solutions
+- Default output is `dist/` (not a fixed absolute path), identical locally and in CI
+- `example-mod/` only demonstrates the layout and is excluded from publishing
+- Bilingual docs use separate `*.en.md` files; Chinese is canonical, and when the
+  translation lags the Chinese version wins
+- No headless smoke test is bundled; use `--mod-directory` with
+  `--create`/`--dump-data` or the community FactorioTest when needed

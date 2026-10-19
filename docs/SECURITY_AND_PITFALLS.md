@@ -183,29 +183,25 @@
 
 **经验总结：把 Mod Portal 发布当成“近似不可回退”的动作。**
 
-## 2. API 端点很容易写错
+## 2. API 端点按用途区分
 
-这次确认过的正确端点是：
+经官方 wiki 核实，两个端点并存，不是二选一：
 
-- `https://mods.factorio.com/api/v2/mods/init_publish`
+- 首次创建新模组：`POST https://mods.factorio.com/api/v2/mods/init_publish`，Token 需要 `ModPortal: Publish Mods`
+- 给已存在的模组发新版本：`POST https://mods.factorio.com/api/v2/mods/releases/init_upload`，Token 需要 `ModPortal: Upload Mods`
+- 如需修改模组详情：另需 `ModPortal: Edit Mods`
 
-错误写法包括：
-
-- `init_upload`
-- 旧版路径
-- 想当然拼出来的 v1/v2 变体
+`init_upload` 不是错误端点，但它只适用于已存在的模组，不能用来创建新模组。workflow 会自动判断模组是否已存在，再选择对应端点。
 
 经验总结：**涉及外部 API 时，不要凭记忆写，先核对官方文档。**
 
-## 3. 首次发布与后续自动发布不是一回事
+## 3. 首次发布与后续自动发布
 
-首次发布新模组时，常常需要先在 Mod Portal 建立模组页面。
+首次发布新模组时，workflow 会调用 `init_publish` 自动创建模组页面；后续版本则走 `releases/init_upload`。
 
-所以不能假设：
+如果自动创建失败（例如 Token 权限不足或平台限制），可以手动在 Mod Portal 上传第一个版本作为兜底。
 
-- “只要 workflow 跑起来就一定能成功上传”
-
-经验总结：**首次发布先手动，后续版本再自动化。**
+经验总结：**首次发布前确认 Token 有 `Publish Mods` 权限；后续版本需要 `Upload Mods` 权限。**
 
 ## 4. 仓库名、作者名、示例信息容易残留真实身份
 
@@ -244,7 +240,7 @@ python3 pack_mods.py
 在准备正式发布前，逐项确认：
 
 - `info.json` 中的版本号正确
-- `changelog.txt` 已更新
+- `changelog.txt` 已更新（推荐）
 - tag 格式正确
 - 模组名和目录名一致
 - zip 内容正确
@@ -258,7 +254,7 @@ python3 pack_mods.py
 - 先人工检查仓库与模组页面
 - 先确认 Secret 已正确配置
 - 先确认这是正式版本而不是测试版本
-- 首次发布优先手动完成
+- 首次发布由 workflow 调用 `init_publish` 自动创建；失败时再手动上传兜底
 
 ## 阶段 4：后续自动发布
 
