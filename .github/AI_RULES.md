@@ -39,7 +39,7 @@
 ### 目录与入口
 
 ```text
-<mod-name>/src/info.json          # 唯一必需文件
+<mod-name>/src/info.json          # 必需元数据（仍需至少一个 .lua 入口）
 <mod-name>/src/control.lua        # 至少一个 .lua 入口
 <mod-name>/src/data.lua
 <mod-name>/src/settings.lua
@@ -49,7 +49,7 @@
 - `factorio_version` 只能是两段式主版本（`"2.0"`）；2.0 的 mod 不会在 2.1 自动加载
 - 入口只认 `.lua`。TypeScript 必须先用 TypeScriptToLua 编译；模板不内置编译链
 - 迁移脚本放 `src/migrations/<mod-version>.lua`；文件名是模组版本，不是 Factorio 版本
-- `changelog.txt` 推荐但非必需；若提供，格式必须严格（99 个短横线、`Version:`、`Date:`）
+- `changelog.txt` 推荐但非必需；若提供，`Version:` 必须存在且与 `info.json` 一致（否则校验失败）；99 个短横线与 `Date:` 缺失只会警告
 
 ## 2. 阶段边界
 
@@ -65,9 +65,10 @@
 
 ### Control
 
-`control.lua` 顶层**只有** `script`、`remote`、`commands` 可用。
+`control.lua` 顶层：`script`、`remote`、`commands` 用于注册；`settings.global`、`defines`、`log`、`require` 可用。
 `game`、`rendering` 在顶层不可用；它们只在 `on_init`、`on_configuration_changed` 和事件回调中可用。
-`on_load` 中不能访问 `game`。
+`settings.get_player_settings(player)` 需要 `player` 对象，只能在回调内调用。
+`on_load` 只对“之前已属于该存档”的模组执行（新存档 / 新模组不执行）；`storage` 可读不可写；不能访问 `game`；合法用途仅限重建元表、重建条件事件、缓存 `storage` 引用。
 `data` 全局在 control 阶段**不存在**（不是“只读”），不能读取也不能修改。
 
 ### 加载顺序
@@ -160,7 +161,8 @@ Workflow 行为：
 | `attempt to index global 'game' (a nil value)` 在 control 顶层 | 顶层读 `game` | 移到 `on_init` 或事件回调 |
 | 模组加载后没有入口 | 只有 `.ts`，没有编译出的 `.lua` | 运行 TypeScriptToLua，或改用 `.lua` |
 | `ModAlreadyExists` | 对已存在的 mod 调用了 `init_publish` | 改用 `releases/init_upload` |
-| 401 / 403 | token scope 不匹配 | 首次发布用 `Publish Mods`，发版用 `Upload Mods` |
+| 401 | Secret 未配置或 token 无效 | 重新生成并更新 `FACTORIO_TOKEN` |
+| 403 | token 有效但 scope 不足 | 首次发布需要 `Publish Mods`，发版需要 `Upload Mods`；推荐同一个 key 同时勾选两者 |
 | `Version mismatch` | tag/zip/info.json 版本不一致 | 用 `verify_mod.py --tag` 定位 |
 | 打包后 zip 里混入 `.git`/`node_modules` | 旧脚本无排除规则 | 使用当前 `pack_mods.py` |
 

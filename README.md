@@ -36,17 +36,31 @@
 git clone https://github.com/YOUR_USERNAME/factorio-mod-starter-ai.git my-factorio-mods
 cd my-factorio-mods
 
-# 删除示例模组，开始你的项目
-rm -rf example-mod/
+# 手动 clone 到自己的新仓库时，建议重新初始化 git 历史
+rm -rf .git && git init
 ```
+
+> 用 GitHub 的 "Use this template" 创建时不需要清 `.git`。
 
 ### 2. 创建你的第一个模组
 
-```bash
-# 创建模组目录
-mkdir -p my-awesome-mod/src
+推荐复制示例作为起点（结构已经是正确的）：
 
-# 创建 info.json
+```bash
+cp -r example-mod my-awesome-mod
+```
+
+然后编辑 `my-awesome-mod/src/info.json`，**必须把 `name` 改成目录名**，并修改
+`author`、`description`、`title`。改完后删除原示例：
+
+```bash
+rm -rf example-mod
+```
+
+也可以从空目录开始：
+
+```bash
+mkdir -p my-awesome-mod/src
 cat > my-awesome-mod/src/info.json << 'EOF'
 {
   "name": "my-awesome-mod",
@@ -58,22 +72,26 @@ cat > my-awesome-mod/src/info.json << 'EOF'
   "dependencies": ["base >= 2.0"]
 }
 EOF
-
-# 创建入口文件
 echo "-- My awesome mod" > my-awesome-mod/src/control.lua
 ```
+
+`info.json` 与至少一个 `.lua` 入口（`control.lua` / `data.lua` / `settings.lua`）是必需的；
+`locale/` 与 `changelog.txt` 按需添加。
 
 ### 3. 本地验证与打包
 
 ```bash
-# 校验 info.json、入口文件与目录结构
-python3 verify_mod.py
+# 1) 校验源码
+python3 verify_mod.py --target my-awesome-mod
 
-# 打包，输出到仓库根目录的 dist/
-python3 pack_mods.py
+# 2) 打包到 dist/
+TARGET_MOD="my-awesome-mod" MOD_OUTPUT_DIR=dist python3 pack_mods.py
+
+# 3) 校验 zip 结构（必须在打包之后）
+python3 verify_mod.py --zip-dir dist --target my-awesome-mod
 ```
 
-`dist/` 下应生成 `<name>_<version>.zip`。zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文件名格式 `{name}_{version}.zip`。本地开发阶段到这里即可，不需要配置 `FACTORIO_TOKEN`。
+`dist/` 下应生成 `<name>_<version>.zip`。zip 内部的 `name_version/` 根目录是模板强制约定（`verify_mod.py --zip-dir` 会校验）；官方只强制 zip 文件名格式 `{name}_{version}.zip`。本地开发阶段到这里即可，不需要配置 `FACTORIO_TOKEN`。
 
 `factorio_version` 只能写一个主版本（如 `"2.0"`）。当前 stable 为 2.0.x，2.1 仍为 experimental；2.0 的模组不会自动在 2.1 加载。
 
@@ -110,6 +128,8 @@ gh release create my-awesome-mod-v1.0.0 \
 ```
 
 Workflow 会自动判断 Mod Portal 上是否已存在该模组：不存在时走 `init_publish` 创建，已存在时走 `releases/init_upload` 发布新版本。
+
+手动触发（不创建 release）时必须指定 `target_mod`；上传时还需 `version`（与 `info.json` 一致）与 `confirm=PUBLISH`。`confirm` 留空只打包：`publish` job 不运行、不查询 Portal、不需要 token。
 
 ---
 

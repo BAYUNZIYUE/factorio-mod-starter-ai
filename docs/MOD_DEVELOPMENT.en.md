@@ -20,7 +20,7 @@ Each mod should use the following layout:
     ├── data-final-fixes.lua
     ├── settings-updates.lua
     ├── settings-final-fixes.lua
-    ├── changelog.txt              # recommended, not required
+    ├── changelog.txt              # recommended, not required; root dir also works, but not both
     ├── thumbnail.png
     ├── locale/
     │   ├── en/
@@ -34,7 +34,7 @@ Each mod should use the following layout:
     └── migrations/                # save migrations (optional)
 ```
 
-`info.json` is the only mandatory file; add other entry files as needed. `changelog.txt` is recommended but optional.
+`info.json` and at least one `.lua` entrypoint are mandatory; add other files as needed. `changelog.txt` is recommended but optional.
 
 Factorio only loads `.lua` entry files. If you use TypeScript, compile it to `.lua` with TypeScriptToLua first; this template does not include that toolchain.
 
@@ -54,7 +54,7 @@ Factorio only loads `.lua` entry files. If you use TypeScript, compile it to `.l
 
 Field meanings:
 
-- `name`: internal mod identifier; must match the directory name and use kebab-case
+- `name`: internal mod identifier; must match the directory name (lowercase letters, digits, `-`, `_`; kebab-case recommended)
 - `version`: semantic version (`major.minor.patch`)
 - `factorio_version`: target Factorio major version; use a single major version such as `"2.0"`. Current stable is 2.0.x and 2.1 is still experimental; a 2.0 mod does not load automatically in 2.1
 - `title`: player-visible mod title
@@ -84,7 +84,7 @@ Game starts
 3. Prototype lock (prototypes can no longer be modified)
   ↓
 4. Control stage: control.lua is loaded
-   - only script, remote, commands are available at the top level
+   - script/remote/commands/settings/defines/log/require available at the top level
    - game and rendering are not available at the top level
   ↓
 5. on_init (new save only)
@@ -92,7 +92,7 @@ Game starts
 6. migrations (loading a save from an older mod version)
    - src/migrations/<mod-version>.lua
   ↓
-7. on_load (every save load)
+7. on_load (existing save loads only; not for new saves/new mods; `storage` read-only)
   ↓
 8. on_configuration_changed (mod or game version changed)
   ↓
@@ -129,16 +129,16 @@ Purpose: runtime logic and event handling.
 
 Available APIs (note where they are available):
 
-- top level: `script`, `remote`, `commands`
+- top level: `script`, `remote`, `commands`, plus `settings.global`, `defines`, `log`, `require`
 - inside callbacks only (`on_init`, `on_configuration_changed`, event handlers): `game`, `rendering`
-- runtime settings: `settings.global`, `settings.player`
+- runtime settings: `settings.global` (readable at the top level), `settings.get_player_settings(player)` (needs a player, callbacks only)
 
 Forbidden:
 
 - using `game` or `rendering` at the top level of `control.lua`
 - accessing the `data` global (it is inaccessible in the control stage; prototypes are locked)
 
-Only `script`, `remote`, and `commands` may be used at the top level. Any logic that needs `game` must live inside `on_init`, `on_configuration_changed`, or an event callback.
+At the top level, `script`, `remote`, `commands`, `settings.global`, `defines`, `log`, and `require` are available; `game` and `rendering` are not. Any logic that needs `game` must live inside `on_init`, `on_configuration_changed`, or an event callback.
 
 ## Common Errors and Fixes
 
@@ -203,7 +203,7 @@ You can reference localized strings in prototypes using localized keys.
 
 ### Mod directory name
 
-- use kebab-case
+- use kebab-case (lowercase + hyphens); underscores are also valid
 - keep it identical to `info.json.name`
 - example: `my-awesome-mod`
 

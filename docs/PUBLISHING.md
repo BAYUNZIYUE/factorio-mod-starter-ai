@@ -18,7 +18,7 @@
 
 你只有以下有限的选择：
 
-1. **上传空版本替换**：创建一个空模组覆盖错误版本
+1. **发布更高版本号的修复版本**：旧版本无法删除或覆盖，发布 `1.0.1` 修复 `1.0.0` 的错误
 2. **标记为弃用**：在 Mod Portal 页面标记版本为 "deprecated"
 3. **联系官方支持**：发邮件到 support@factorio.com 请求删除（不保证成功）
 
@@ -83,7 +83,7 @@
 
 ```json
 {
-  "name": "example-mod",
+  "name": "your-mod",
   "version": "1.0.1",
   ...
 }
@@ -103,8 +103,9 @@ Date: 2026-04-07
 ### 步骤 2: 提交更改
 
 ```bash
-git add example-mod/src/info.json example-mod/src/changelog.txt
-git commit -m "example-mod: Bump version to 1.0.1"
+git add your-mod/src/info.json
+git add your-mod/src/changelog.txt   # 若 changelog 放模组根目录，则为 your-mod/changelog.txt
+git commit -m "your-mod: Bump version to 1.0.1"
 git push origin main
 ```
 
@@ -112,12 +113,12 @@ git push origin main
 
 ```bash
 # 创建 tag（格式：<mod-name>-v<version>）
-git tag example-mod-v1.0.1
-git push origin example-mod-v1.0.1
+git tag your-mod-v1.0.1
+git push origin your-mod-v1.0.1
 
 # 创建 release
 # ⚠️ 这会真实发布到 Mod Portal，已发布版本不可删除
-gh release create example-mod-v1.0.1 \
+gh release create your-mod-v1.0.1 \
   --title "Example Mod v1.0.1" \
   --notes "Bug fixes and improvements"
 ```
@@ -126,8 +127,8 @@ gh release create example-mod-v1.0.1 \
 
 1. 访问仓库的 "Actions" 标签
 2. 查看 "Publish to Factorio Mod Portal" workflow
-3. 确认所有步骤成功（绿色勾号）
-4. 访问 `https://mods.factorio.com/mod/<mod-name>` 确认新版本已发布
+3. 确认 **`Upload to Mod Portal` job 实际运行并成功**（不是 skipped；dry-run 或 prerelease 时它会跳过，Actions 仍显示绿色）
+4. 访问 `https://mods.factorio.com/mod/<mod-name>` 确认新版本号已出现
 
 ## 多模组发布
 
@@ -144,10 +145,14 @@ gh release create example-mod-v1.0.1 \
 gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a
 ```
 
-确认产物无误后，再执行上传：
+> 此时 `publish` job 不运行：不查询 Mod Portal、不需要 token、不执行发布脚本；
+> zip 仍会作为 GitHub Actions artifact 保留。Actions 绿色不代表已发布。
+
+确认产物无误后，带 `version` 与 `confirm` 上传（`version` 必须与 `info.json` 一致）：
 
 ```bash
-gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a -f confirm=PUBLISH
+gh workflow run publish-to-mod-portal.yml \
+  -f target_mod=mod-a -f version=1.1.0 -f confirm=PUBLISH
 ```
 
 ## Tag 命名规则
@@ -155,11 +160,11 @@ gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a -f confirm=PUBLISH
 **格式**: `<mod-name>-v<version>`
 
 **示例**:
-- ✅ `example-mod-v1.0.0`
+- ✅ `your-mod-v1.0.0`
 - ✅ `another-mod-v2.1.0`
 - ❌ `v1.0.0` (缺少模组名)
-- ❌ `example-mod_v1.0.0` (使用下划线)
-- ❌ `example-mod-1.0.0` (缺少 v 前缀)
+- ❌ `your-mod_v1.0.0` (使用下划线)
+- ❌ `your-mod-1.0.0` (缺少 v 前缀)
 
 **重要**:
 - `<mod-name>` 必须与模组目录名完全一致
@@ -234,13 +239,13 @@ python3 pack_mods.py
 
 2. 创建正确的 tag：
    ```bash
-   git tag example-mod-v1.0.0
-   git push origin example-mod-v1.0.0
+   git tag your-mod-v1.0.0
+   git push origin your-mod-v1.0.0
    ```
 
 ### 场景 2: 版本号不一致
 
-Workflow 不会在发布前自动检查版本一致性。发布前请运行：
+Workflow 会在打包前运行 `verify_mod.py --tag` 校验；不一致时直接失败，不会进入发布。本地仍建议先运行：
 
 ```bash
 python3 verify_mod.py --target <mod-name> --tag <tag>
@@ -253,7 +258,7 @@ python3 verify_mod.py --target <mod-name> --tag <tag>
 错误信息：
 
 ```
-❌ Upload response indicates failure:
+❌ <name>: 上传失败 HTTP <code>: ...（示意，实际以日志为准）
 {"error": "Mod does not exist"}
 ```
 
@@ -261,12 +266,12 @@ python3 verify_mod.py --target <mod-name> --tag <tag>
 
 首次发布新模组时，workflow 会自动调用 `init_publish` 创建页面（见上文"首次发布新模组"）。若仍报此错，请检查 Token 权限，或改用手动上传兜底。
 
-### 场景 4: API Key 权限不足
+### 场景 4: API Key 权限不足（403）
 
 错误信息：
 
 ```
-❌ init_publish/init_upload failed (HTTP 401)
+❌ init 请求失败 HTTP 403: ...
 ```
 
 解决方案：
@@ -274,6 +279,8 @@ python3 verify_mod.py --target <mod-name> --tag <tag>
 1. 访问 https://factorio.com/profile
 2. 重新生成 API Key，勾选 `ModPortal: Publish Mods` 与 `ModPortal: Upload Mods`（如需修改详情再加 `ModPortal: Edit Mods`）
 3. 更新 GitHub Secret `FACTORIO_TOKEN`
+
+> 401 表示 Secret 缺失或 token 无效，不是 scope 问题；403 才是 scope 不足。
 
 ## 回滚版本
 
@@ -295,10 +302,10 @@ git add .
 git commit -m "Fix critical bug"
 git push origin main
 
-git tag example-mod-v1.0.2
-git push origin example-mod-v1.0.2
+git tag your-mod-v1.0.2
+git push origin your-mod-v1.0.2
 
-gh release create example-mod-v1.0.2 \
+gh release create your-mod-v1.0.2 \
   --title "Example Mod v1.0.2 (Hotfix)" \
   --notes "Fixed critical bug in v1.0.1"
 ```
@@ -327,7 +334,7 @@ gh release create example-mod-v1.0.2 \
 
 ### 环境变量
 
-- `MOD_OUTPUT_DIR`: 打包输出目录（CI 环境：`dist/`）
+- `MOD_OUTPUT_DIR`: 打包输出目录（仅本地生效；CI 固定使用 `dist/`）
 - `TARGET_MOD`: 指定要打包的模组（从 tag 提取）
 - `FACTORIO_TOKEN`: Factorio API Key（GitHub Secret）
 

@@ -30,16 +30,17 @@ export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-打包所有模组：
+打包所有**非 example** 模组（模板仓库只有 `example-mod` 时会报“未找到任何模组目录”，属预期）：
 
 ```bash
 export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-验证输出：
+只想验证示例模组：
 
 ```bash
+TARGET_MOD="example-mod" MOD_OUTPUT_DIR="./dist" python3 pack_mods.py
 ls -lh dist/
 # 应该看到: example-mod_1.0.0.zip
 ```
@@ -64,7 +65,7 @@ example-mod_1.0.0/
         └── locale.cfg
 ```
 
-zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文件名格式 `{name}_{version}.zip`。
+zip 内部的 `name_version/` 根目录是模板强制约定（`verify_mod.py --zip-dir` 会校验）；官方只强制 zip 文件名格式 `{name}_{version}.zip`。
 
 ## 配置 Factorio API Key
 
@@ -89,6 +90,8 @@ zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文
 6. 点击 "Create"
 7. 复制生成的 API Key（只显示一次，请妥善保存）
 
+> 推荐同一个 key 同时勾选 `Publish Mods` 与 `Upload Mods`，之后无需更换；只勾一个会在另一场景返回 403。`Edit Mods` 只在修改描述/分类时需要。
+
 ### 2. 在 GitHub 配置 Secret
 
 1. 访问你的 GitHub 仓库
@@ -104,8 +107,10 @@ zip 内部的 `name_version/` 根目录是模板约定；官方只强制 zip 文
 **不要用 release/tag 来验证配置。** 本地运行 `python3 pack_mods.py` + `python3 verify_mod.py` 即可完成验证。release 一旦触发就会真实发布，且 Mod Portal 版本不可删除。
 
 ```bash
-python3 verify_mod.py    # 校验 info.json、入口与目录结构
-python3 pack_mods.py     # 输出到 dist/
+export MOD_NAME=my-mod
+python3 verify_mod.py --target "$MOD_NAME"                  # 校验 info.json、入口与目录结构
+TARGET_MOD="$MOD_NAME" python3 pack_mods.py                 # 输出到 dist/
+python3 verify_mod.py --zip-dir dist --target "$MOD_NAME"   # 校验 zip，必须在打包后运行
 ```
 
 确认 zip 生成且内容正确后，再为正式发布配置 Secret。
@@ -118,7 +123,7 @@ python3 pack_mods.py     # 输出到 dist/
 
 - 默认值：`dist`（仓库根目录下）
 - 可按需覆盖，例如 `export MOD_OUTPUT_DIR="./out"`
-- CI 环境同样使用 `dist/`
+- CI 固定使用 `dist/`，不读取该变量；该变量只影响本地 `pack_mods.py`
 
 ### TARGET_MOD
 
@@ -190,7 +195,7 @@ example-mod: info.json 缺少字段: author, description
 错误信息：
 
 ```
-❌ init_publish/init_upload failed (HTTP 401)
+❌ init 请求失败 HTTP 401
 ```
 
 解决方案：
@@ -204,7 +209,7 @@ example-mod: info.json 缺少字段: author, description
 错误信息：
 
 ```
-❌ Upload response indicates failure:
+❌ <name>: 上传失败 HTTP <code>: ...（示意，实际以日志为准）
 {"error": "Mod does not exist"}
 ```
 

@@ -118,7 +118,7 @@ gh release create my-awesome-mod-v1.0.0 \
 
 ### 目录命名
 
-- 使用 kebab-case（小写字母 + 连字符）
+- 推荐使用 kebab-case（小写字母 + 连字符）；下划线也合法
 - 模组目录名必须与 `info.json` 中的 `name` 一致
 - 示例：`my-awesome-mod`
 
@@ -174,6 +174,7 @@ git push origin mod-a-v1.0.0
 ```bash
 gh workflow run publish-to-mod-portal.yml \
   -f target_mod=mod-a \
+  -f version=1.1.0 \
   -f confirm=PUBLISH
 ```
 
@@ -220,7 +221,7 @@ gh workflow run publish-to-mod-portal.yml \
 - [Factorio Lua API 文档](https://lua-api.factorio.com/)
 - [Factorio Mod Portal API](https://wiki.factorio.com/Mod_publish_API)
 - [Factorio 模组开发教程](https://wiki.factorio.com/Tutorial:Modding_tutorial)
-- [Data Lifecycle](https://lua-api.factorio.com/latest/Data-Lifecycle.html)
+- [Data Lifecycle](https://lua-api.factorio.com/latest/auxiliary/data-lifecycle.html)
 
 ## 联系方式
 

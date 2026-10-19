@@ -56,7 +56,7 @@ example-mod: info.json 缺少字段: author, description
 
 **错误信息**:
 ```
-example-mod: src/ 中缺少 control/data/settings 入口文件
+example-mod: src/ 中缺少 Lua 入口文件（control.lua / data.lua / settings.lua 至少一个）
 ```
 
 **原因**: `src/` 目录下没有任何入口文件
@@ -75,7 +75,7 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 **错误信息**:
 ```
-❌ init_publish/init_upload failed (HTTP 401)
+❌ init 请求失败 HTTP 401
 ```
 
 **原因**: GitHub Secret `FACTORIO_TOKEN` 未配置或无效
@@ -92,7 +92,7 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 **错误信息**:
 ```
-❌ Upload response indicates failure:
+❌ <name>: 上传失败 HTTP <code>: ...（示意，实际以日志为准）
 {"error": "Mod does not exist"}
 ```
 
@@ -136,13 +136,13 @@ example-mod: src/ 中缺少 control/data/settings 入口文件
 
 2. 创建正确的 tag：
    ```bash
-   git tag example-mod-v1.0.0
-   git push origin example-mod-v1.0.0
+   git tag your-mod-v1.0.0
+   git push origin your-mod-v1.0.0
    ```
 
 ### 问题 4: 版本号不一致
 
-Workflow 不会自动检查版本一致性。发布前运行：
+Workflow 会在打包前自动校验版本一致性；不一致时直接失败，不会进入发布。本地仍建议先运行：
 
 ```bash
 python3 verify_mod.py --target <mod-name> --tag <tag>
@@ -152,7 +152,7 @@ python3 verify_mod.py --target <mod-name> --tag <tag>
 
 示例：
 
-- Tag: `example-mod-v1.0.1`
+- Tag: `your-mod-v1.0.1`
 - `info.json`: `"version": "1.0.1"`
 
 ### 问题 5: Workflow 使用旧代码

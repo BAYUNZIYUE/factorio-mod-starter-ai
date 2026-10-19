@@ -43,7 +43,7 @@ Fix: create at least one of (`.lua` only; Factorio does not load `.ts`, so compi
 
 ### Problem 1: `FACTORIO_TOKEN` is missing or invalid
 
-Common error: `init_publish/init_upload failed (HTTP 401)`.
+Common error: `init 请求失败 HTTP 401`.
 
 Fix:
 

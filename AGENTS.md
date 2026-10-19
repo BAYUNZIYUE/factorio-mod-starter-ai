@@ -14,7 +14,7 @@
 | 角色 | 位置 | 是否提交 |
 |---|---|---|
 | 项目规则 | `AGENTS.md` / `.github/AI_RULES.md` | 是 |
-| 个人环境信息（本机路径、token、调试笔记） | `AGENTS.local.md`（若工具支持）或本地未跟踪文件 | 否 |
+| 个人环境信息（本机路径、token、调试笔记） | `AGENTS.local.md`（已由 `.gitignore` 忽略） | 否 |
 | 打包产物 | `dist/` | 否（已在 `.gitignore`） |
 
 ## 目录约定
@@ -22,8 +22,8 @@
 ```text
 <mod-name>/
 ├── src/
-│   ├── info.json              # 唯一必需文件
-│   ├── control.lua            # 运行时；顶层只有 script/remote/commands
+│   ├── info.json              # 必需元数据（仍需至少一个 .lua 入口）
+│   ├── control.lua            # 运行时；顶层 game/rendering 不可用
 │   ├── data.lua               # 原型；data-updates.lua / data-final-fixes.lua
 │   ├── settings.lua           # 设置；settings-updates.lua / settings-final-fixes.lua
 │   ├── locale/<lang>/locale.cfg
@@ -31,7 +31,7 @@
 │   ├── scripts/               # 运行时逻辑拆分
 │   ├── prototypes/
 │   ├── graphics/
-│   └── changelog.txt          # 推荐，非必需
+│   └── changelog.txt          # 推荐，非必需；也可放模组根目录，但不能两处都有
 └── README.md
 ```
 
@@ -49,11 +49,12 @@
 |---|---|---|
 | `settings*` | `data:extend` 设置原型、`settings.startup` | `game`、`script`、运行时 API |
 | `data*` | `data:extend`、`data.raw`、原型定义/修改、`settings.startup` | `game`、`script`、`remote`、事件注册 |
-| `control.lua` 顶层 | `script`、`remote`、`commands` | `game`、`rendering`、`data`（不存在） |
+| `control.lua` 顶层 | `script` / `remote` / `commands`（注册）、`settings.global`、`defines`、`log`、`require` | `game`、`rendering`、`data`（不存在）、`settings.get_player_settings`（需要 player） |
 | 事件回调 / `on_init` / `on_configuration_changed` | 完整运行时 API、`game`、`rendering` | 修改原型（已锁定） |
 
 存档加载顺序：`control.lua` → `on_init` → migrations → `on_load` → `on_configuration_changed` → 事件。
-`on_load` 中不能访问 `game`；`data` 在 control 阶段不可访问，不是“只读”。
+`on_load` 只对“之前已属于该存档”的模组执行（新存档 / 新加入的模组不执行，改走 `on_init`）；`storage` 可读但不可写；不能访问 `game`；官方合法用途仅限重建元表、重建条件事件、缓存 `storage` 引用。
+`data` 在 control 阶段不可访问，不是“只读”。
 
 ## 发布（高风险，不可逆）
 
@@ -75,6 +76,13 @@ python3 verify_mod.py --zip-dir dist  # zip：根目录/必需文件/垃圾文�
 ```
 
 只有以上命令全部通过，才算“改完”。CI 在 push/PR 时跑同一组检查（`.github/workflows/verify.yml`）。
+
+补充说明：
+
+- 源码校验默认包含 `example-mod`（模板自身必须保持合法）；打包默认排除它，`INCLUDE_EXAMPLE=1` 可把示例纳入打包
+- `--zip-dir` 只校验已生成的 zip；报“目录不存在/没有 zip”时先跑 `pack_mods.py`
+- 打包不会清理 `dist/` 里的旧版本；发布前清空 `dist/`，或发布时用 `scripts/publish_mod.py --tag <tag>` 精确选择（`pack_mods.py` 没有 `--tag` 参数）
+- 不要本地直接运行 `scripts/publish_mod.py --all`；本地发布必须用 `--tag`，并先跑 `verify_mod.py --zip-dir`
 
 ## 禁止事项（没有明确授权时）
 
@@ -100,5 +108,5 @@ python3 verify_mod.py --zip-dir dist  # zip：根目录/必需文件/垃圾文�
 
 - 默认输出 `dist/`（不是固定绝对路径），本地与 CI 一致
 - `example-mod/` 仅用于展示结构，默认排除发布
-- 双语采用 `*.en.md` 独立文件，中文为 canonical；英文翻译滞后时以中文为准
+- 双语采用 `*.en.md` 独立文件；中英文必须同步。事实性描述（端点、字段、命令、CI 行为）以代码与 workflow 为准，冲突时先改代码再同步文档
 - 模板不内置 headless smoke test；需要时用 `--mod-directory` + `--create`/`--dump-data` 或社区 FactorioTest

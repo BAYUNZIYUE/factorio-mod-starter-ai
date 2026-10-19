@@ -61,5 +61,5 @@ example-mod/
 ## References
 
 - [Factorio Lua API](https://lua-api.factorio.com/)
-- [Data Lifecycle](https://lua-api.factorio.com/latest/Data-Lifecycle.html)
+- [Data Lifecycle](https://lua-api.factorio.com/latest/auxiliary/data-lifecycle.html)
 - [Modding Tutorial](https://wiki.factorio.com/Tutorial:Modding_tutorial)

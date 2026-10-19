@@ -30,17 +30,20 @@ export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-Package all mods:
+Package all **non-example** mods (a bare template with only `example-mod` reports
+"No mods found", which is expected):
 
 ```bash
 export MOD_OUTPUT_DIR="./dist"
 python3 pack_mods.py
 ```
 
-Verify the output:
+To smoke-test the example itself:
 
 ```bash
+TARGET_MOD="example-mod" MOD_OUTPUT_DIR="./dist" python3 pack_mods.py
 ls -lh dist/
+# example-mod_1.0.0.zip
 ```
 
 ### 3. Verify zip structure
@@ -63,7 +66,7 @@ example-mod_1.0.0/
         └── locale.cfg
 ```
 
-The `name_version/` root folder inside the zip is a template convention. Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
+The `name_version/` root folder inside the zip is a template-enforced convention (checked by `verify_mod.py --zip-dir`); Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
 
 ## Configure the Factorio API Key
 
@@ -88,6 +91,10 @@ Especially remember:
 6. Click **Create**
 7. Copy the key immediately; it is shown only once
 
+> Recommended: put both `Publish Mods` and `Upload Mods` on the same key, so you never
+> have to swap secrets. A key with only one scope returns 403 in the other case.
+> `Edit Mods` is only needed for editing descriptions/categories.
+
 ### 2. Add the secret in GitHub
 
 1. Open your GitHub repository
@@ -102,8 +109,10 @@ Especially remember:
 **Do not use a release or tag to verify configuration.** Run `python3 pack_mods.py` and `python3 verify_mod.py` locally instead. A release triggers a real publish as soon as it is created, and Mod Portal versions cannot be deleted.
 
 ```bash
-python3 verify_mod.py    # validate info.json, entrypoints, and layout
-python3 pack_mods.py     # write the archive to dist/
+export MOD_NAME=my-mod
+python3 verify_mod.py --target "$MOD_NAME"                  # validate metadata, entrypoints, layout
+TARGET_MOD="$MOD_NAME" python3 pack_mods.py                 # package into dist/
+python3 verify_mod.py --zip-dir dist --target "$MOD_NAME"   # validate the zip (after packaging)
 ```
 
 Only configure the secret when you are actually ready for a formal release.
@@ -116,7 +125,7 @@ Packaging output directory.
 
 - Default: `dist` (in the repository root)
 - Override when needed, e.g. `export MOD_OUTPUT_DIR="./out"`
-- CI also uses `dist/`
+- CI always uses `dist/` and does not read this variable; it only affects local `pack_mods.py`
 
 ### `TARGET_MOD`
 
@@ -160,7 +169,7 @@ Fix by adding the required fields in `info.json`.
 
 ### GitHub Actions fails because `FACTORIO_TOKEN` is missing
 
-Common symptom: unauthorized upload failure (`init_publish/init_upload failed (HTTP 401)`).
+Common symptom: unauthorized upload failure (`init 请求失败 HTTP 401`).
 
 Fix:
 

@@ -35,8 +35,12 @@ git init
 ### 2. Create Your First Mod
 
 ```bash
-# Copy example mod as starting point
+# Copy the example as a starting point
 cp -r example-mod/ my-awesome-mod/
+rm -rf example-mod/
+
+# Required: change "name" in my-awesome-mod/src/info.json to "my-awesome-mod"
+# and update author/description/title before packaging.
 
 # Edit mod info
 vim my-awesome-mod/src/info.json
@@ -60,14 +64,17 @@ Current stable Factorio is 2.0.x; 2.1 is still experimental. `factorio_version` 
 ### 3. Verify and Package Locally
 
 ```bash
-# Validate info.json, entrypoints, and layout
-python3 verify_mod.py
+# 1) Validate sources
+python3 verify_mod.py --target my-awesome-mod
 
-# Package into dist/ at the repository root
-python3 pack_mods.py
+# 2) Package into dist/
+TARGET_MOD="my-awesome-mod" MOD_OUTPUT_DIR=dist python3 pack_mods.py
+
+# 3) Validate the zip layout (must run after packaging)
+python3 verify_mod.py --zip-dir dist --target my-awesome-mod
 ```
 
-The archive is written to `dist/<name>_<version>.zip`. The `name_version/` root folder inside the zip is a template convention; Mod Portal only enforces the zip filename format `{name}_{version}.zip`. Local development stops here; no `FACTORIO_TOKEN` is needed.
+The archive is written to `dist/<name>_<version>.zip`. The `name_version/` root folder inside the zip is a template-enforced convention (checked by `verify_mod.py --zip-dir`); Mod Portal only enforces the zip filename format `{name}_{version}.zip`. Local development stops here; no `FACTORIO_TOKEN` is needed.
 
 ### 4. Push Your Code
 
@@ -102,6 +109,10 @@ gh release create my-awesome-mod-v1.0.0 \
 ```
 
 The workflow detects whether the mod already exists on Mod Portal: it calls `init_publish` for a new mod and `releases/init_upload` for an existing one.
+
+Manual dispatch (without a release) requires `target_mod`; uploading also needs
+`version` (matching `info.json`) and `confirm=PUBLISH`. With an empty `confirm`
+the `publish` job does not run: no Portal query, no token needed.
 
 ---
 
@@ -190,14 +201,16 @@ factorio-mod-starter-ai/
 
 ### Control Stage (`control.lua`, `scripts/`)
 
-Only `script`, `remote`, and `commands` are available at the top level of `control.lua`. `game` and `rendering` are **not** available there; use them only inside `on_init`, `on_configuration_changed`, or event callbacks.
+At the top level of `control.lua`, `script`, `remote`, `commands`, `settings.global`, `defines`, `log`, and `require` are available. `game` and `rendering` are **not** available there; use them only inside `on_init`, `on_configuration_changed`, or event callbacks.
 
 **Available in the control stage:**
 - `script` (event registration; top level)
 - `remote` (inter-mod communication; top level)
 - `commands` (custom console commands; top level)
+- `settings.global`, `defines`, `log`, `require` (top level)
+- `settings.get_player_settings(player)` (needs a player, callbacks only)
 - `game`, `rendering` (inside callbacks only)
-- `settings.global`, `settings.player` (runtime settings)
+- `settings.global`, `settings.get_player_settings(player)` (runtime settings)
 
 **Not available:**
 - `data` (the `data` global is inaccessible in the control stage — it is not "read-only", it simply does not exist there; prototypes are locked)
@@ -317,10 +330,12 @@ empty (package only):
 gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a
 ```
 
-Then upload after checking the artifact:
+Then upload after checking the artifact (the `version` input must match
+`info.json`):
 
 ```bash
-gh workflow run publish-to-mod-portal.yml -f target_mod=mod-a -f confirm=PUBLISH
+gh workflow run publish-to-mod-portal.yml \
+  -f target_mod=mod-a -f version=1.1.0 -f confirm=PUBLISH
 ```
 
 ---
@@ -360,7 +375,7 @@ example-mod_1.0.0/
 └── locale/en/locale.cfg
 ```
 
-The `name_version/` root folder inside the zip is a template convention. Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
+The `name_version/` root folder inside the zip is a template-enforced convention (checked by `verify_mod.py --zip-dir`); Mod Portal only enforces the zip filename format `{name}_{version}.zip`.
 
 ---
 

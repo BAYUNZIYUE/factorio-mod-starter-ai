@@ -8,8 +8,8 @@ This directory contains two GitHub Actions workflows.
 
 Runs on pushes to `main` and on pull requests, and never touches secrets:
 
-1. `python3 verify_mod.py` validates all mod sources
-2. packages `example-mod` as a smoke test
+1. `python3 verify_mod.py` validates all mod sources (CI fails if no mod exists)
+2. packages the repository's real mods; if only `example-mod` exists, uses it as a smoke fixture
 3. `python3 verify_mod.py --zip-dir dist` validates the zip layout
 
 ## `publish-to-mod-portal.yml`
@@ -20,9 +20,10 @@ Two jobs:
 
 1. checkout: for a release, the **commit the tag points to**; for manual
    dispatch, the selected branch
-2. parse the tag and validate `<mod-name>-v<major.minor.patch>`
-3. `verify_mod.py --target <mod> --tag <tag>` checks that the directory name,
-   `info.json`, and tag agree
+2. release event: parse the tag and validate `<mod-name>-v<major.minor.patch>`
+3. release event: `verify_mod.py --target <mod> --tag <tag>` checks the directory
+   name, `info.json`, and tag; manual dispatch: validate `target_mod` (and the
+   optional `version`), no `--tag`
 4. package into `dist/`
 5. validate the zip layout
 6. upload the artifact
@@ -45,7 +46,8 @@ published. Requirements:
 
 - tag format `<mod-name>-v<major.minor.patch>`
 - tag version matches `src/info.json` `version`
-- prereleases never upload
+- prereleases never upload; converting a prerelease to a full release fires
+  `released` (which the workflow subscribes to) and re-runs the upload
 
 ### 2. Manual trigger
 
@@ -56,12 +58,25 @@ Click **Run workflow** in GitHub Actions:
 | `target_mod` | required; only this mod directory is processed |
 | `confirm` | empty = package only (dry-run); `PUBLISH` = actually upload |
 
-`example-mod` is rejected and cannot be published manually.
+> What dry-run means: the `publish` job **does not run at all** — it does not query
+> the Mod Portal, does not need `FACTORIO_TOKEN`, and does not execute the publish
+> script. The zip is still kept as a GitHub Actions artifact. It does not validate
+> token/scope. A green run may simply have a skipped `publish` job.
+
+When `confirm=PUBLISH`, the `version` input is required and must match
+`src/info.json`.
+
+`example-mod` is rejected during the `package` job's meta validation — even for a
+dry-run with an empty `confirm`. Locally, `TARGET_MOD=example-mod python3 pack_mods.py`
+is only for inspecting the sample artifact.
 
 ## Approval and concurrency
 
 - the `publish` job uses `environment: mod-portal-production`; configure
   required reviewers under Settings → Environments
+- **without required reviewers, GitHub creates the environment with no
+  protection**: a release publishes immediately. Once configured, both releases
+  and manual dispatches pause for approval
 - global `concurrency` serializes publishes so two jobs cannot hit the Mod
   Portal at the same time
 

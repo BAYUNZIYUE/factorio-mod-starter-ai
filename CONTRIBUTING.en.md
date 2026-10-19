@@ -119,7 +119,7 @@ If you want to improve the template itself, pull requests are welcome.
 
 ### Naming
 
-- Use kebab-case for mod directory names
+- Use kebab-case for mod directory names (underscores are also valid)
 - Keep the directory name identical to `info.json.name`
 - Example: `my-awesome-mod`
 
@@ -173,8 +173,7 @@ uploads only when `confirm` is `PUBLISH`:
 
 ```bash
 gh workflow run publish-to-mod-portal.yml \
-  -f target_mod=mod-a \
-  -f confirm=PUBLISH
+  -f target_mod=mod-a -f version=1.1.0 -f confirm=PUBLISH
 ```
 
 Without `confirm`, the workflow only packages and uploads an artifact.
@@ -218,7 +217,7 @@ Mods created from this template may use any license you choose.
 - [Factorio Lua API](https://lua-api.factorio.com/)
 - [Factorio Mod Portal API](https://wiki.factorio.com/Mod_publish_API)
 - [Factorio Modding Tutorial](https://wiki.factorio.com/Tutorial:Modding_tutorial)
-- [Data Lifecycle](https://lua-api.factorio.com/latest/Data-Lifecycle.html)
+- [Data Lifecycle](https://lua-api.factorio.com/latest/auxiliary/data-lifecycle.html)
 
 ## Contact
 

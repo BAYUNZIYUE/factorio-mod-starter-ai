@@ -42,7 +42,7 @@ publishing**.
 ### Layout and entrypoints
 
 ```text
-<mod-name>/src/info.json          # the only mandatory file
+<mod-name>/src/info.json          # required metadata (still needs one .lua entrypoint)
 <mod-name>/src/control.lua        # at least one .lua entrypoint
 <mod-name>/src/data.lua
 <mod-name>/src/settings.lua
@@ -56,8 +56,9 @@ publishing**.
   TypeScriptToLua first; this template does not ship a build chain
 - Migrations go in `src/migrations/<mod-version>.lua`; the filename is the MOD
   version, not the Factorio version
-- `changelog.txt` is recommended but not required; if present, its format is
-  strict (99 dashes, `Version:`, `Date:`)
+- `changelog.txt` is recommended but not required; if present, `Version:` must
+  exist and match `info.json` (otherwise validation fails); missing 99 dashes or
+  `Date:` only warns
 
 ## 2. Stage boundaries
 
@@ -73,10 +74,15 @@ Forbidden: `game`, `script`, `remote`, event registration, game state access
 
 ### Control
 
-At the top level of `control.lua` **only** `script`, `remote`, `commands` exist.
+At the top level of `control.lua`: `script`, `remote`, `commands` (registration),
+plus `settings.global`, `defines`, `log`, `require`.
 `game` and `rendering` are unavailable there; they become available in
 `on_init`, `on_configuration_changed`, and event handlers.
-`on_load` cannot access `game`.
+`settings.get_player_settings(player)` needs a player object, so callbacks only.
+`on_load` runs only for mods already part of the save (new saves/new mods run
+`on_init`); `storage` is readable but not writable; `game` is unavailable; the
+only legitimate uses are rebuilding metatables, re-registering conditional
+handlers, and caching `storage` references.
 The `data` global **does not exist** in the control stage (it is not
 "read-only"); it can neither be read nor modified.
 
@@ -173,7 +179,8 @@ Before publishing:
 | `game` is nil at control top level | reading `game` during load | move to `on_init` or an event handler |
 | Mod loads with no entrypoint | only `.ts`, no compiled `.lua` | run TypeScriptToLua, or use `.lua` |
 | `ModAlreadyExists` | `init_publish` used for an existing mod | use `releases/init_upload` |
-| 401 / 403 | token scope mismatch | `Publish Mods` for first publish, `Upload Mods` for releases |
+| 401 | secret missing or token invalid | regenerate and update `FACTORIO_TOKEN` |
+| 403 | token is valid but lacks scope | `Publish Mods` for first publish, `Upload Mods` for releases; one key with both scopes is recommended |
 | `Version mismatch` | tag/zip/info.json disagree | locate with `verify_mod.py --tag` |
 | `.git`/`node_modules` inside the zip | old packaging script had no excludes | use the current `pack_mods.py` |
 

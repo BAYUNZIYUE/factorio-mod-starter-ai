@@ -203,6 +203,8 @@
 
 经验总结：**首次发布前确认 Token 有 `Publish Mods` 权限；后续版本需要 `Upload Mods` 权限。**
 
+发布 workflow 使用 `environment: mod-portal-production`。**未在仓库 Settings → Environments 中配置 required reviewers 时，该 environment 没有审批保护**：release 一创建就会直接上传。配置后，release 与手动触发都会暂停等待批准。
+
 ## 4. 仓库名、作者名、示例信息容易残留真实身份
 
 模板仓库最容易忽略的问题不是代码，而是“元数据残留”：

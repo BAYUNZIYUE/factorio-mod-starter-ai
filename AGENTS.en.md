@@ -17,7 +17,7 @@ Template vs. instance repository:
 | Role | Location | Committed? |
 |---|---|---|
 | Project rules | `AGENTS.md` / `.github/AI_RULES.md` | yes |
-| Personal environment notes (local paths, tokens, debugging notes) | `AGENTS.local.md` (if supported) or an untracked local file | no |
+| Personal environment notes (local paths, tokens, debugging notes) | `AGENTS.local.md` (already gitignored) | no |
 | Build output | `dist/` | no (already in `.gitignore`) |
 
 ## Layout
@@ -25,8 +25,8 @@ Template vs. instance repository:
 ```text
 <mod-name>/
 ├── src/
-│   ├── info.json              # the only mandatory file
-│   ├── control.lua            # runtime; top level has script/remote/commands only
+│   ├── info.json              # required metadata (still needs one .lua entrypoint)
+│   ├── control.lua            # runtime; game/rendering unavailable at top level
 │   ├── data.lua               # prototypes; data-updates.lua / data-final-fixes.lua
 │   ├── settings.lua           # settings; settings-updates.lua / settings-final-fixes.lua
 │   ├── locale/<lang>/locale.cfg
@@ -34,7 +34,7 @@ Template vs. instance repository:
 │   ├── scripts/               # runtime helpers
 │   ├── prototypes/
 │   ├── graphics/
-│   └── changelog.txt          # recommended, not required
+│   └── changelog.txt          # recommended, not required; root dir also works, but not both
 └── README.md
 ```
 
@@ -57,13 +57,16 @@ Hard rules:
 |---|---|---|
 | `settings*` | `data:extend` setting prototypes, `settings.startup` | `game`, `script`, runtime API |
 | `data*` | `data:extend`, `data.raw`, prototype definitions/edits, `settings.startup` | `game`, `script`, `remote`, event registration |
-| `control.lua` top level | `script`, `remote`, `commands` | `game`, `rendering`, `data` (does not exist) |
+| `control.lua` top level | `script` / `remote` / `commands` (registration), `settings.global`, `defines`, `log`, `require` | `game`, `rendering`, `data` (does not exist), `settings.get_player_settings` (needs a player) |
 | Event handlers / `on_init` / `on_configuration_changed` | full runtime API, `game`, `rendering` | mutating prototypes (locked) |
 
 Save load order: `control.lua` → `on_init` → migrations → `on_load` →
 `on_configuration_changed` → event handlers.
-`on_load` cannot access `game`; `data` is **not accessible** in the control
-stage (it is not "read-only").
+`on_load` runs only for mods that were already part of the save (new saves/new
+mods run `on_init` instead); `storage` is readable but not writable; `game` is
+unavailable; the only legitimate uses are rebuilding metatables, re-registering
+conditional handlers, and caching `storage` references.
+`data` is **not accessible** in the control stage (it is not "read-only").
 
 ## Publishing (high risk, irreversible)
 
@@ -92,6 +95,17 @@ python3 verify_mod.py --zip-dir dist        # zip: root dir/required files/junk/
 A change is done only when all three pass. CI runs the same checks on push/PR
 (`.github/workflows/verify.yml`).
 
+Notes:
+
+- source verification includes `example-mod` by default (the template itself must
+  stay valid); packaging excludes it unless `INCLUDE_EXAMPLE=1`
+- `--zip-dir` only validates zips that already exist; run `pack_mods.py` first
+- packaging does not clean old versions from `dist/`; clear it, or use
+  `scripts/publish_mod.py --tag <tag>` when publishing (`pack_mods.py` has no
+  `--tag` flag)
+- do not run `scripts/publish_mod.py --all` locally; local publishing must use
+  `--tag` after `verify_mod.py --zip-dir`
+
 ## Do not (without explicit authorization)
 
 - Create a release, push a tag, or trigger a remote publish
@@ -116,7 +130,8 @@ A change is done only when all three pass. CI runs the same checks on push/PR
 
 - Default output is `dist/` (not a fixed absolute path), identical locally and in CI
 - `example-mod/` only demonstrates the layout and is excluded from publishing
-- Bilingual docs use separate `*.en.md` files; Chinese is canonical, and when the
-  translation lags the Chinese version wins
+- Bilingual docs use separate `*.en.md` files and must stay in sync. For facts
+  (endpoints, fields, commands, CI behavior), code and workflows are the source
+  of truth; fix the code first, then update both docs
 - No headless smoke test is bundled; use `--mod-directory` with
   `--create`/`--dump-data` or the community FactorioTest when needed

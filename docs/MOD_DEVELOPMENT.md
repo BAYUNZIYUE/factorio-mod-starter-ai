@@ -20,7 +20,7 @@
     ├── data-final-fixes.lua     # 最终原型修改（可选）
     ├── settings-updates.lua     # 设置修改（可选）
     ├── settings-final-fixes.lua # 最终设置修改（可选）
-    ├── changelog.txt            # 推荐但非必需
+    ├── changelog.txt            # 推荐但非必需；也可放模组根目录，但不能两处都有
     ├── thumbnail.png            # 模组缩略图（可选）
     ├── locale/                  # 本地化文件
     │   ├── en/
@@ -34,7 +34,7 @@
     └── migrations/              # 存档迁移脚本（可选）
 ```
 
-`info.json` 是唯一强制文件，其余入口文件按需添加；`changelog.txt` 推荐但非必需。
+`info.json` 与至少一个 `.lua` 入口文件是强制的；其余按需添加；`changelog.txt` 推荐但非必需。
 
 Factorio 只加载 `.lua` 入口文件。如使用 TypeScript，必须先用 TypeScriptToLua 编译为 `.lua`；本模板不内置该编译链。
 
@@ -54,7 +54,7 @@ Factorio 只加载 `.lua` 入口文件。如使用 TypeScript，必须先用 Typ
 
 字段说明：
 
-- `name`: 模组内部标识符，必须与目录名一致，使用 kebab-case
+- `name`: 模组内部标识符，必须与目录名一致（允许小写字母、数字、`-`、`_`，推荐 kebab-case）
 - `version`: 语义化版本号（major.minor.patch）
 - `factorio_version`: 目标 Factorio 主版本，只能写一个主版本号（如 `"2.0"`）。当前 stable 为 2.0.x，2.1 仍为 experimental；2.0 的模组不会自动在 2.1 加载
 - `title`: 玩家可见的模组名称
@@ -84,7 +84,7 @@ Factorio 的加载流程不止三个阶段。进入游戏后，Settings 与 Data
 3. 原型锁定（原型不能再修改）
   ↓
 4. Control 阶段：control.lua 加载
-   - 顶层只能使用 script、remote、commands
+   - 顶层可用 script/remote/commands/settings/defines/log/require；game、rendering 不可用
    - game、rendering 在顶层不可用
   ↓
 5. on_init（新存档首次创建时）
@@ -92,7 +92,7 @@ Factorio 的加载流程不止三个阶段。进入游戏后，Settings 与 Data
 6. migrations（从旧版本存档升级时）
    - src/migrations/<mod-version>.lua
   ↓
-7. on_load（每次存档加载时）
+7. on_load（仅已有存档加载时；新存档/新模组不执行；`storage` 只读）
   ↓
 8. on_configuration_changed（模组或游戏版本变化时）
   ↓
@@ -161,15 +161,15 @@ end
 **目的**: 运行时逻辑和事件处理
 
 **可用 API**（注意可用位置）:
-- 顶层：`script` (事件注册、全局变量)、`remote` (模组间通信)、`commands` (自定义控制台命令)
+- 顶层：`script` (事件注册、全局变量)、`remote` (模组间通信)、`commands` (自定义控制台命令)，以及 `settings.global`、`defines`、`log`、`require`
 - 仅回调内（`on_init` / `on_configuration_changed` / 事件回调）：`game` (游戏状态访问)、`rendering` (渲染 API)
-- 运行时设置：`settings.global`, `settings.player`
+- 运行时设置：`settings.global`（顶层可读）、`settings.get_player_settings(player)`（需要 player，只能在回调内使用）
 
 **禁止使用**:
 - 在 `control.lua` 顶层使用 `game` 或 `rendering`
 - 访问 `data` 全局（`data` 在 control 阶段不可访问，原型已锁定）
 
-顶层只允许 `script`、`remote`、`commands`；需要 `game` 的逻辑必须放进 `on_init`、`on_configuration_changed` 或事件回调。
+顶层可用 `script`、`remote`、`commands` 以及 `settings.global`、`defines`、`log`、`require`；需要 `game` 的逻辑必须放进 `on_init`、`on_configuration_changed` 或事件回调。
 
 **示例**:
 
@@ -278,7 +278,7 @@ Factorio 会自动根据玩家语言加载对应的 `locale.cfg`。
 
 ### 模组目录名
 
-- 使用 kebab-case（小写字母 + 连字符）
+- 推荐 kebab-case（小写字母 + 连字符）；下划线也合法，但不要与目录名混用风格
 - 必须与 `info.json` 中的 `name` 字段一致
 - 示例: `my-awesome-mod`
 
